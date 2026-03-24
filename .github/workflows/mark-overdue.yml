@@ -1,0 +1,30 @@
+# .github/workflows/mark-overdue.yml
+# Runs every day at midnight IST to mark unpaid past-due rents as overdue
+
+name: Mark Overdue Rents
+
+on:
+  schedule:
+    # 12:00 AM IST = 6:30 PM UTC previous day
+    - cron: '30 18 * * *'
+  workflow_dispatch:
+
+jobs:
+  mark-overdue:
+    name: Update Overdue Rent Status
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Mark overdue rents via Supabase RPC
+        run: |
+          curl -s -X POST \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/mark_overdue_rents" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}'
+          echo "✅ Overdue rents marked"

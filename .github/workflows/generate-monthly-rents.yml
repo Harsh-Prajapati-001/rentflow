@@ -1,0 +1,39 @@
+# .github/workflows/generate-monthly-rents.yml
+# Runs on the 1st of every month at 1:00 AM IST (7:30 PM UTC on last day)
+# Calls the Supabase Edge Function to auto-generate rent records
+
+name: Generate Monthly Rent Records
+
+on:
+  schedule:
+    # 1st of every month at 1:00 AM IST = 7:30 PM UTC previous day
+    # We use 00:00 UTC on 1st as a simpler approximation
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+
+jobs:
+  generate:
+    name: Auto-generate rent records
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Trigger Edge Function
+        run: |
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/generate-monthly-rents" \
+            -H "Authorization: Bearer ${{ secrets.FUNCTION_SECRET }}" \
+            -H "Content-Type: application/json")
+
+          HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS" | cut -d: -f2)
+          BODY=$(echo "$RESPONSE" | grep -v "HTTP_STATUS")
+
+          echo "Response: $BODY"
+          echo "HTTP Status: $HTTP_STATUS"
+
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "❌ Edge Function failed with status $HTTP_STATUS"
+            exit 1
+          fi
+
+          echo "✅ Monthly rents generated successfully"
