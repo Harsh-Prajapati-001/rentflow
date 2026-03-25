@@ -1,18 +1,21 @@
 // scheduler/whatsapp-notifier.js
 // Runs via GitHub Actions (cron) every day at 8:00 AM IST
-// Uses whatsapp-web.js for free WhatsApp messaging
+// Uses Twilio API for WhatsApp messaging
 // Node.js 18+
 
 import { createClient } from '@supabase/supabase-js'
-import { Client, LocalAuth, MessageMedia } from 'whatsapp-web.js'
-import qrcode from 'qrcode-terminal'
-import fs from 'fs'
-import path from 'path'
+import twilio from 'twilio'
 
 // ── Supabase Setup ────────────────────────────────────────
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY  // Service role for server-side access
+)
+
+// ── Twilio Setup ──────────────────────────────────────────
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
 )
 
 // ── Message Templates ─────────────────────────────────────
@@ -30,77 +33,18 @@ const TEMPLATES = {
     `🚨 *Rent Overdue - ${days} Days*\n\nHi ${name},\n\nYour rent of *₹${amount}* is *${days} days overdue*.\n\nImmediate payment required. Contact your owner if you have any issues.\n\n_RentFlow Property Management_`,
 }
 
-// ── WhatsApp Client ───────────────────────────────────────
-let waClient = null
-
-async function initWhatsApp() {
-  return new Promise((resolve, reject) => {
-    // In CI/GitHub Actions, session is restored from secret (base64 encoded)
-    const sessionDir = path.join(process.cwd(), '.wwebjs_auth')
-
-    // Restore session from environment variable if available
-    if (process.env.WA_SESSION_DATA) {
-      try {
-        const sessionData = Buffer.from(process.env.WA_SESSION_DATA, 'base64').toString('utf8')
-        fs.mkdirSync(path.join(sessionDir, 'session'), { recursive: true })
-        fs.writeFileSync(
-          path.join(sessionDir, 'session', 'session.json'),
-          sessionData
-        )
-        console.log('✅ WhatsApp session restored from env')
-      } catch (err) {
-        console.warn('⚠️ Could not restore WA session:', err.message)
-      }
-    }
-
-    waClient = new Client({
-      authStrategy: new LocalAuth({ dataPath: sessionDir }),
-      puppeteer: {
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--no-first-run',
-          '--no-zygote',
-          '--single-process',
-        ],
-      },
-    })
-
-    waClient.on('qr', (qr) => {
-      console.log('📱 Scan this QR code with WhatsApp:')
-      qrcode.generate(qr, { small: true })
-      // In first-time setup mode, print QR and exit for user to scan
-      if (process.env.SETUP_MODE === 'true') {
-        console.log('\nRun this script locally with SETUP_MODE=true to scan QR.')
-        console.log('Then save the session data to your GitHub Secret WA_SESSION_DATA.')
-      }
-    })
-
-    waClient.on('ready', () => {
-      console.log('✅ WhatsApp client ready')
-      resolve(waClient)
-    })
-
-    waClient.on('auth_failure', (msg) => {
-      console.error('❌ WhatsApp auth failed:', msg)
-      reject(new Error('WhatsApp auth failed'))
-    })
-
-    waClient.initialize()
-  })
-}
-
 // ── Send WhatsApp Message ─────────────────────────────────
 async function sendMessage(phone, message, tenantId, rentRecordId, messageType) {
   try {
-    // Normalize phone to WhatsApp format (India: +91XXXXXXXXXX)
+    // Normalize phone to WhatsApp format (with +)
     const normalized = normalizePhone(phone)
-    const chatId = `${normalized}@c.us`
 
-    await waClient.sendMessage(chatId, message)
+    // Send via Twilio
+    await twilioClient.messages.create({
+      from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
+      to: `whatsapp:${normalized}`,
+      body: message,
+    })
 
     // Log to Supabase
     await supabase.from('notification_logs').insert({
@@ -134,11 +78,13 @@ function normalizePhone(phone) {
   // Remove all non-digits
   const digits = phone.replace(/\D/g, '')
   // If starts with 0, replace with 91
-  if (digits.startsWith('0')) return '91' + digits.slice(1)
-  // If 10 digits (Indian mobile), prepend 91
-  if (digits.length === 10) return '91' + digits
+  if (digits.startsWith('0')) return '+91' + digits.slice(1)
+  // If 10 digits (Indian mobile), prepend +91
+  if (digits.length === 10) return '+91' + digits
+  // If doesn't start with +, add it
+  if (!digits.startsWith('+')) return '+' + digits
   // Already has country code
-  return digits
+  return '+' + digits
 }
 
 // ── Already Notified Today Check ─────────────────────────
@@ -206,9 +152,6 @@ async function runScheduler() {
     console.log('✅ No notifications needed today')
     return
   }
-
-  // Initialize WhatsApp
-  await initWhatsApp()
 
   let sent = 0, skipped = 0, failed = 0
 
@@ -306,14 +249,11 @@ async function runScheduler() {
     if (success) sent++
     else failed++
 
-    // Small delay to avoid WhatsApp rate limiting
-    await new Promise((r) => setTimeout(r, 2000))
+    // Small delay to respect Twilio rate limits
+    await new Promise((r) => setTimeout(r, 1000))
   }
 
   console.log(`\n📊 Summary: Sent=${sent} | Skipped=${skipped} | Failed=${failed}`)
-
-  // Cleanup
-  await waClient.destroy()
   console.log('✅ Scheduler complete')
 }
 
