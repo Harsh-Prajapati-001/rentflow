@@ -12,7 +12,7 @@ A full-stack property management PWA built entirely on **free-tier services**.
 | Backend Logic | Supabase RLS + Edge Functions | FREE |
 | File Storage | Supabase Storage | FREE (1GB) |
 | Scheduler | GitHub Actions (cron) | FREE |
-| WhatsApp | whatsapp-web.js | FREE workaround |
+| WhatsApp | Twilio API | Paid(usage based) |
 
 ---
 
