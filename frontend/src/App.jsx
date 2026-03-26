@@ -9,18 +9,24 @@ import './styles/global.css'
 
 function ProtectedRoute({ children, role }) {
   const { user, profile, loading } = useAuth()
-  if (loading) return <div className="page-loading">Loading...</div>
+  
+  // FIX: If we have a user, wait until their profile data arrives before making routing decisions
+  if (loading || (user && !profile)) return <div className="page-loading">Loading...</div>
+  
   if (!user) return <Navigate to="/login" replace />
+  
   if (role && profile?.role !== role) {
     return <Navigate to={profile?.role === 'owner' ? '/owner' : '/tenant'} replace />
   }
+  
   return children
 }
 
 function AppRoutes() {
   const { user, profile, loading } = useAuth()
 
-  if (loading) return <div className="page-loading">Loading...</div>
+  // FIX: If we have a user, wait until their profile data arrives before making routing decisions
+  if (loading || (user && !profile)) return <div className="page-loading">Loading...</div>
 
   return (
     <Routes>
