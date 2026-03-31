@@ -1,5 +1,10 @@
 // Supabase Edge Function — generate-monthly-rents
-// POSTPAID: generates bill for last month's stay, due this month
+// FIX: Gemini Issue #2 — Schema mismatches corrected:
+//   - due_date    → due_date_day  (correct column name)
+//   - month/year  → stay_month/stay_year (correct column names)
+//   - period_start and period_end now included (NOT NULL in schema)
+// POSTPAID: bill for last month's stay, due this month
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -19,52 +24,64 @@ serve(async (req) => {
   const today = new Date()
 
   // POSTPAID: bill for the month that just completed
-  // Running on April 1 → billing for March (month 3)
+  // Running on April 1 → billing for March (stay_month=3)
   const stayMonth = today.getMonth() === 0 ? 12 : today.getMonth()
   const stayYear  = today.getMonth() === 0 ? today.getFullYear() - 1 : today.getFullYear()
 
+  // FIX: correct column name is due_date_day (not due_date)
   const { data: tenants, error } = await supabase
     .from('tenants')
-    .select('id, room_id, building_id, rooms(rent_amount, due_date)')
+    .select('id, room_id, building_id, rooms(rent_amount, due_date_day)')
     .eq('is_active', true)
     .not('room_id', 'is', null)
 
-  if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500 })
+  if (error) {
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 })
+  }
 
-  let created = 0, skipped = 0
+  let created = 0
+  let skipped = 0
 
   for (const tenant of tenants ?? []) {
+    // Check if record already exists for this stay month
     const { data: existing } = await supabase
       .from('rent_records')
       .select('id')
       .eq('tenant_id', tenant.id)
-      .eq('month', stayMonth)
-      .eq('year', stayYear)
+      .eq('stay_month', stayMonth)   // FIX: stay_month not month
+      .eq('stay_year', stayYear)     // FIX: stay_year not year
       .maybeSingle()
 
     if (existing) { skipped++; continue }
 
-    // Due date = X days into the month AFTER the stay month
-    const dueDay   = (tenant.rooms as any)?.due_date ?? 5
+    // FIX: correct column name due_date_day
+    const dueDay   = (tenant.rooms as any)?.due_date_day ?? 5
     const dueMonth = stayMonth === 12 ? 1 : stayMonth + 1
     const dueYear  = stayMonth === 12 ? stayYear + 1 : stayYear
-    const dueDate  = new Date(dueYear, dueMonth - 1, dueDay)
+
+    // FIX: period_start and period_end are NOT NULL — must always be provided
+    const periodStart = new Date(stayYear, stayMonth - 1, 1)
+    const periodEnd   = new Date(stayYear, stayMonth, 0)  // last day of stay month
+    const dueDate     = new Date(dueYear, dueMonth - 1, dueDay)
 
     const { error: insertErr } = await supabase.from('rent_records').insert({
-      tenant_id:   tenant.id,
-      room_id:     tenant.room_id,
-      building_id: tenant.building_id,
-      month:       stayMonth,
-      year:        stayYear,
-      amount:      (tenant.rooms as any)?.rent_amount ?? 0,
-      due_date:    dueDate.toISOString().split('T')[0],
-      status:      'unpaid',
+      tenant_id:    tenant.id,
+      room_id:      tenant.room_id,
+      building_id:  tenant.building_id,
+      stay_month:   stayMonth,          // FIX: stay_month
+      stay_year:    stayYear,           // FIX: stay_year
+      period_start: periodStart.toISOString().split('T')[0],  // FIX: NOT NULL
+      period_end:   periodEnd.toISOString().split('T')[0],    // FIX: NOT NULL
+      amount:       (tenant.rooms as any)?.rent_amount ?? 0,
+      due_date:     dueDate.toISOString().split('T')[0],
+      status:       'unpaid',
     })
 
     if (!insertErr) created++
+    else console.error('Insert error for tenant', tenant.id, insertErr.message)
   }
 
-  // Also auto-mark overdue
+  // Also mark any past-due unpaid records as overdue
   await supabase
     .from('rent_records')
     .update({ status: 'overdue' })

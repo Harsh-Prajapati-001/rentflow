@@ -1,30 +1,48 @@
 # .github/workflows/mark-overdue.yml
-# Runs every day at midnight IST to mark unpaid past-due rents as overdue
+#
+# FIX: Gemini Issue #3 — Wrong RPC function name
+# The old workflow called /rpc/mark_overdue_rents which does not exist.
+# The correct function is run_daily_overdue_check() which:
+#   - marks unpaid rent records as overdue
+#   - marks unpaid electricity records as overdue
+#   - sends day-count in-app notifications (1 day overdue, 2 days overdue...)
+#
+# Runs every day at 12:30 AM IST (7:00 PM UTC previous day)
 
-name: Mark Overdue Rents
+name: Daily Overdue Check
 
 on:
   schedule:
-    # 12:00 AM IST = 6:30 PM UTC previous day
-    - cron: '30 18 * * *'
+    # 12:30 AM IST = 7:00 PM UTC
+    - cron: '0 19 * * *'
   workflow_dispatch:
 
 jobs:
-  mark-overdue:
-    name: Update Overdue Rent Status
+  run-overdue-check:
+    name: Mark overdue records + send day-count notifications
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Mark overdue rents via Supabase RPC
+      - name: Call run_daily_overdue_check via Supabase RPC
         run: |
-          curl -s -X POST \
-            "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/mark_overdue_rents" \
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/run_daily_overdue_check" \
             -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             -H "Content-Type: application/json" \
-            -d '{}'
-          echo "✅ Overdue rents marked"
+            -d '{}')
+
+          HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS" | cut -d: -f2)
+          BODY=$(echo "$RESPONSE" | grep -v "HTTP_STATUS")
+
+          echo "Response body: $BODY"
+          echo "HTTP Status: $HTTP_STATUS"
+
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "❌ RPC call failed with status $HTTP_STATUS"
+            exit 1
+          fi
+
+          echo "✅ Daily overdue check completed successfully"
+          echo "$BODY"
