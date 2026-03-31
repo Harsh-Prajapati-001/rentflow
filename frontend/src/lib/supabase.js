@@ -1,335 +1,334 @@
-// frontend/src/lib/supabase.js
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables')
+  console.error('⚠️ Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY - add to Vercel env vars')
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-  },
+  auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true }
 })
 
-// ── Auth helpers ──────────────────────────────────────────
-export const signUp = async ({ email, password, fullName, role, phone }) => {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { full_name: fullName, role, phone },
-    },
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+
+// ── Auth ──────────────────────────────────────────────────
+export const signUp = ({ email, password, fullName, role, phone }) =>
+  supabase.auth.signUp({ email, password, options: { data: { full_name: fullName, role, phone } } })
+
+export const signIn = ({ email, password }) =>
+  supabase.auth.signInWithPassword({ email, password })
+
+export const signOut = () => supabase.auth.signOut()
+
+export const getProfile = (userId) =>
+  supabase.from('profiles').select('*').eq('id', userId).single()
+
+export const updateProfile = (userId, updates) =>
+  supabase.from('profiles').update(updates).eq('id', userId)
+
+// ── Owner lookup (for tenant registration) ────────────────
+export const findOwnerByCredentials = async (email, phone) => {
+  const { data, error } = await supabase.rpc('find_owner_by_credentials', {
+    p_email: email, p_phone: phone.replace(/\D/g, '')
   })
   return { data, error }
 }
 
-export const signIn = async ({ email, password }) => {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-  return { data, error }
-}
-
-export const signOut = async () => {
-  const { error } = await supabase.auth.signOut()
-  return { error }
-}
-
-export const getProfile = async (userId) => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single()
-  return { data, error }
-}
+export const getOwnerBuildings = async (ownerId) =>
+  supabase.from('buildings').select('*, rooms(id, room_number, floor, rent_amount, is_occupied)').eq('owner_id', ownerId)
 
 // ── Buildings ─────────────────────────────────────────────
-export const getBuildings = async (ownerId) => {
-  const { data, error } = await supabase
-    .from('buildings')
-    .select('*, rooms(count)')
-    .eq('owner_id', ownerId)
-    .order('created_at', { ascending: true })
-  return { data, error }
-}
+export const getBuildings = (ownerId) =>
+  supabase.from('buildings').select('*').eq('owner_id', ownerId).order('created_at')
 
-export const createBuilding = async ({ ownerId, name, address }) => {
-  const { data, error } = await supabase
-    .from('buildings')
-    .insert({ owner_id: ownerId, name, address })
-    .select()
-    .single()
-  return { data, error }
-}
+export const createBuilding = ({ ownerId, name, address }) =>
+  supabase.from('buildings').insert({ owner_id: ownerId, name, address }).select().single()
 
-export const updateBuilding = async (id, updates) => {
-  const { data, error } = await supabase
-    .from('buildings')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single()
-  return { data, error }
-}
+export const updateBuilding = (id, updates) =>
+  supabase.from('buildings').update(updates).eq('id', id).select().single()
 
-export const deleteBuilding = async (id) => {
-  const { error } = await supabase.from('buildings').delete().eq('id', id)
-  return { error }
-}
+export const deleteBuilding = (id) =>
+  supabase.from('buildings').delete().eq('id', id)
 
 // ── Rooms ─────────────────────────────────────────────────
-export const getRooms = async (buildingId) => {
-  const { data, error } = await supabase
-    .from('rooms')
-    .select('*, tenants(id, full_name, phone, is_active)')
-    .eq('building_id', buildingId)
-    .order('room_number')
-  return { data, error }
-}
+export const getRooms = (buildingId) =>
+  supabase.from('rooms')
+    .select('*, tenants(id, full_name, phone, is_active, user_id)')
+    .eq('building_id', buildingId).order('room_number')
 
-export const createRoom = async (roomData) => {
-  const { data, error } = await supabase
-    .from('rooms')
-    .insert(roomData)
-    .select()
-    .single()
-  return { data, error }
-}
+export const getRoomById = (id) =>
+  supabase.from('rooms').select('*').eq('id', id).single()
 
-export const updateRoom = async (id, updates) => {
-  const { data, error } = await supabase
-    .from('rooms')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single()
-  return { data, error }
-}
+export const createRoom = (roomData) =>
+  supabase.from('rooms').insert(roomData).select().single()
 
-export const deleteRoom = async (id) => {
-  const { error } = await supabase.from('rooms').delete().eq('id', id)
-  return { error }
-}
+export const updateRoom = (id, updates) =>
+  supabase.from('rooms').update(updates).eq('id', id).select().single()
+
+export const deleteRoom = (id) =>
+  supabase.from('rooms').delete().eq('id', id)
 
 // ── Tenants ───────────────────────────────────────────────
-export const getTenants = async (buildingId) => {
-  const { data, error } = await supabase
-    .from('tenants')
-    .select('*, rooms(room_number, rent_amount)')
-    .eq('building_id', buildingId)
-    .eq('is_active', true)
-    .order('full_name')
-  return { data, error }
+export const getTenants = (buildingId) =>
+  supabase.from('tenants')
+    .select('*, rooms(room_number, rent_amount, due_date_day)')
+    .eq('building_id', buildingId).eq('is_active', true).order('full_name')
+
+export const getTenantByUserId = (userId) =>
+  supabase.from('tenants')
+    .select('*, rooms(*), buildings(name, address, owner_id)')
+    .eq('user_id', userId).eq('is_active', true).single()
+
+export const createTenant = (tenantData) =>
+  supabase.from('tenants').insert(tenantData).select().single()
+
+export const updateTenant = (id, updates) =>
+  supabase.from('tenants').update(updates).eq('id', id).select().single()
+
+// ── Room Requests ─────────────────────────────────────────
+export const getRoomRequests = (buildingId) =>
+  supabase.from('room_requests')
+    .select('*, rooms(room_number, floor, rent_amount), profiles(full_name, phone, email)')
+    .eq('building_id', buildingId).order('created_at', { ascending: false })
+
+export const getMyRoomRequests = (userId) =>
+  supabase.from('room_requests')
+    .select('*, rooms(room_number, floor, rent_amount), buildings(name)')
+    .eq('tenant_user_id', userId).order('created_at', { ascending: false })
+
+export const createRoomRequest = ({ tenantUserId, roomId, buildingId, ownerId, message }) =>
+  supabase.from('room_requests').insert({
+    tenant_user_id: tenantUserId, room_id: roomId,
+    building_id: buildingId, owner_id: ownerId, message
+  }).select().single()
+
+export const updateRoomRequest = (id, status) =>
+  supabase.from('room_requests').update({ status }).eq('id', id)
+
+export const approveRoomRequest = async (requestId, tenantId) => {
+  // Mark request approved
+  await supabase.from('room_requests').update({ status: 'approved' }).eq('id', requestId)
+  // Withdraw all other pending requests from the same tenant
+  const { data: req } = await supabase.from('room_requests').select('tenant_user_id, owner_id').eq('id', requestId).single()
+  if (req) {
+    await supabase.from('room_requests')
+      .update({ status: 'withdrawn' })
+      .eq('tenant_user_id', req.tenant_user_id)
+      .eq('owner_id', req.owner_id)
+      .eq('status', 'pending')
+  }
 }
 
-export const getTenantByUserId = async (userId) => {
-  const { data, error } = await supabase
+// ── AUTO-GENERATE RENT (POSTPAID) ─────────────────────────
+// Stay month M → Bill due on day X of month M+1
+// Runs silently every time dashboard loads
+export const autoGenerateRentRecords = async (buildingId) => {
+  const { data: tenants, error } = await supabase
     .from('tenants')
-    .select('*, rooms(*), buildings(name, address)')
-    .eq('user_id', userId)
-    .eq('is_active', true)
-    .single()
-  return { data, error }
-}
+    .select('id, room_id, building_id, join_date, rooms(rent_amount, due_date_day)')
+    .eq('building_id', buildingId).eq('is_active', true).not('room_id', 'is', null)
 
-export const createTenant = async (tenantData) => {
-  const { data, error } = await supabase
-    .from('tenants')
-    .insert(tenantData)
-    .select()
-    .single()
-  return { data, error }
-}
+  if (error || !tenants?.length) return { created: 0 }
 
-export const updateTenant = async (id, updates) => {
-  const { data, error } = await supabase
-    .from('tenants')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single()
-  return { data, error }
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const lastStayMonth = today.getMonth() === 0 ? 12 : today.getMonth()
+  const lastStayYear = today.getMonth() === 0 ? today.getFullYear() - 1 : today.getFullYear()
+  let created = 0
+
+  for (const tenant of tenants) {
+    if (!tenant.room_id) continue
+    const joinDate = new Date(tenant.join_date || today)
+    let genMonth = joinDate.getMonth() + 1
+    let genYear = joinDate.getFullYear()
+
+    while (genYear < lastStayYear || (genYear === lastStayYear && genMonth <= lastStayMonth)) {
+      const { data: existing } = await supabase.from('rent_records')
+        .select('id').eq('tenant_id', tenant.id)
+        .eq('stay_month', genMonth).eq('stay_year', genYear).maybeSingle()
+
+      if (!existing) {
+        const dueDay = tenant.rooms?.due_date_day || 5
+        const dueMonth = genMonth === 12 ? 1 : genMonth + 1
+        const dueYear = genMonth === 12 ? genYear + 1 : genYear
+        const periodStart = new Date(genYear, genMonth - 1, 1)
+        const periodEnd = new Date(genYear, genMonth, 0) // last day of stay month
+        const dueDate = new Date(dueYear, dueMonth - 1, dueDay)
+
+        await supabase.from('rent_records').insert({
+          tenant_id: tenant.id, room_id: tenant.room_id,
+          building_id: tenant.building_id,
+          stay_month: genMonth, stay_year: genYear,
+          period_start: periodStart.toISOString().split('T')[0],
+          period_end: periodEnd.toISOString().split('T')[0],
+          amount: tenant.rooms?.rent_amount || 0,
+          due_date: dueDate.toISOString().split('T')[0],
+          status: 'unpaid'
+        })
+        created++
+      }
+      if (genMonth === 12) { genMonth = 1; genYear++ } else genMonth++
+    }
+  }
+
+  // Auto-mark overdue
+  await supabase.from('rent_records').update({ status: 'overdue' })
+    .eq('building_id', buildingId).eq('status', 'unpaid')
+    .lt('due_date', today.toISOString().split('T')[0])
+
+  return { created }
 }
 
 // ── Rent Records ──────────────────────────────────────────
-export const getRentRecords = async (buildingId, month, year) => {
-  let query = supabase
-    .from('rent_records')
+export const getRentRecords = (buildingId, month, year) => {
+  let q = supabase.from('rent_records')
     .select('*, tenants(full_name, phone, whatsapp_number), rooms(room_number)')
     .eq('building_id', buildingId)
-
-  if (month) query = query.eq('month', month)
-  if (year) query = query.eq('year', year)
-
-  const { data, error } = await query.order('due_date')
-  return { data, error }
+  if (month) q = q.eq('stay_month', month)
+  if (year) q = q.eq('stay_year', year)
+  return q.order('due_date')
 }
 
-export const getTenantRentRecords = async (tenantId) => {
-  const { data, error } = await supabase
-    .from('rent_records')
-    .select('*')
-    .eq('tenant_id', tenantId)
-    .order('year', { ascending: false })
-    .order('month', { ascending: false })
-  return { data, error }
-}
+export const getAllRentRecords = (buildingId) =>
+  supabase.from('rent_records')
+    .select('*, tenants(full_name), rooms(room_number)')
+    .eq('building_id', buildingId)
+    .order('stay_year', { ascending: false })
+    .order('stay_month', { ascending: false })
 
-export const createRentRecord = async (rentData) => {
-  const { data, error } = await supabase
-    .from('rent_records')
-    .insert(rentData)
-    .select()
-    .single()
-  return { data, error }
-}
+export const getTenantRentRecords = (tenantId) =>
+  supabase.from('rent_records').select('*').eq('tenant_id', tenantId)
+    .order('stay_year', { ascending: false }).order('stay_month', { ascending: false })
 
-export const updateRentRecord = async (id, updates) => {
-  const { data, error } = await supabase
-    .from('rent_records')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single()
-  return { data, error }
-}
+export const getRoomRentHistory = (roomId) =>
+  supabase.from('rent_records').select('*, tenants(full_name)')
+    .eq('room_id', roomId).order('stay_year', { ascending: false }).order('stay_month', { ascending: false })
 
-export const markRentPaid = async (id, paymentMethod) => {
-  const { data, error } = await supabase
-    .from('rent_records')
-    .update({ status: 'paid', paid_date: new Date().toISOString().split('T')[0], payment_method: paymentMethod })
-    .eq('id', id)
-    .select()
-    .single()
-  return { data, error }
-}
+export const markRentPaid = (id, paymentMethod) =>
+  supabase.from('rent_records').update({
+    status: 'paid',
+    paid_date: new Date().toISOString().split('T')[0],
+    payment_method: paymentMethod
+  }).eq('id', id).select().single()
+
+export const updateRentRecord = (id, updates) =>
+  supabase.from('rent_records').update(updates).eq('id', id).select().single()
 
 // ── Electricity ───────────────────────────────────────────
-export const getElectricityRecords = async (buildingId, month, year) => {
-  let query = supabase
-    .from('electricity_records')
+export const getElectricityRecords = (buildingId, month, year) => {
+  let q = supabase.from('electricity_records')
+    .select('*, rooms(room_number, last_meter_reading, rate_per_unit), tenants(full_name)')
+    .eq('building_id', buildingId)
+  if (month) q = q.eq('stay_month', month)
+  if (year) q = q.eq('stay_year', year)
+  return q.order('reading_date', { ascending: false })
+}
+
+export const getAllElectricityRecords = (buildingId) =>
+  supabase.from('electricity_records')
     .select('*, rooms(room_number), tenants(full_name)')
     .eq('building_id', buildingId)
+    .order('stay_year', { ascending: false }).order('stay_month', { ascending: false })
 
-  if (month) query = query.eq('month', month)
-  if (year) query = query.eq('year', year)
+export const getRoomElectricityHistory = (roomId) =>
+  supabase.from('electricity_records').select('*, tenants(full_name)')
+    .eq('room_id', roomId).order('stay_year', { ascending: false }).order('stay_month', { ascending: false })
 
-  const { data, error } = await query.order('reading_date', { ascending: false })
-  return { data, error }
-}
+export const getTenantElectricityRecords = (tenantId) =>
+  supabase.from('electricity_records').select('*').eq('tenant_id', tenantId)
+    .order('stay_year', { ascending: false }).order('stay_month', { ascending: false })
 
-export const createElectricityRecord = async (elecData) => {
-  const { data, error } = await supabase
-    .from('electricity_records')
-    .insert(elecData)
-    .select()
-    .single()
-  return { data, error }
-}
+export const createElectricityRecord = (data) =>
+  supabase.from('electricity_records').insert(data).select().single()
+
+export const markElectricityPaid = (id, paymentMethod) =>
+  supabase.from('electricity_records').update({
+    status: 'paid',
+    paid_date: new Date().toISOString().split('T')[0],
+    payment_method: paymentMethod
+  }).eq('id', id).select().single()
 
 // ── Documents ─────────────────────────────────────────────
-export const getDocuments = async (tenantId) => {
-  const { data, error } = await supabase
-    .from('documents')
-    .select('*')
-    .eq('tenant_id', tenantId)
-    .order('created_at', { ascending: false })
-  return { data, error }
-}
+export const getDocuments = (tenantId) =>
+  supabase.from('documents').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })
 
 export const uploadDocument = async ({ tenantId, buildingId, uploadedBy, docType, file }) => {
-  const fileExt = file.name.split('.').pop()
-  const filePath = `${buildingId}/${tenantId}/${docType}_${Date.now()}.${fileExt}`
-
-  const { error: uploadError } = await supabase.storage
-    .from('tenant-documents')
+  const ext = file.name.split('.').pop()
+  const filePath = `${buildingId}/${tenantId}/${docType}_${Date.now()}.${ext}`
+  const { error: upErr } = await supabase.storage.from('tenant-documents')
     .upload(filePath, file, { cacheControl: '3600', upsert: false })
-
-  if (uploadError) return { data: null, error: uploadError }
-
-  const { data, error } = await supabase
-    .from('documents')
-    .insert({
-      tenant_id: tenantId,
-      building_id: buildingId,
-      uploaded_by: uploadedBy,
-      doc_type: docType,
-      file_name: file.name,
-      file_path: filePath,
-      file_size: file.size,
-      mime_type: file.type,
-    })
-    .select()
-    .single()
-
-  return { data, error }
+  if (upErr) return { data: null, error: upErr }
+  return supabase.from('documents').insert({
+    tenant_id: tenantId, building_id: buildingId, uploaded_by: uploadedBy,
+    doc_type: docType, file_name: file.name, file_path: filePath,
+    file_size: file.size, mime_type: file.type
+  }).select().single()
 }
 
 export const getDocumentUrl = async (filePath) => {
-  const { data } = await supabase.storage
-    .from('tenant-documents')
-    .createSignedUrl(filePath, 3600)
+  const { data } = await supabase.storage.from('tenant-documents').createSignedUrl(filePath, 3600)
   return data?.signedUrl
 }
 
 // ── Notifications ─────────────────────────────────────────
-export const getNotifications = async (userId) => {
-  const { data, error } = await supabase
-    .from('notifications')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(50)
-  return { data, error }
-}
+export const getNotifications = (userId) =>
+  supabase.from('notifications').select('*').eq('user_id', userId)
+    .order('created_at', { ascending: false }).limit(100)
 
-export const markNotificationRead = async (id) => {
-  const { error } = await supabase
-    .from('notifications')
-    .update({ is_read: true })
-    .eq('id', id)
-  return { error }
-}
+export const markNotificationRead = (id) =>
+  supabase.from('notifications').update({ is_read: true }).eq('id', id)
 
-export const markAllNotificationsRead = async (userId) => {
-  const { error } = await supabase
-    .from('notifications')
-    .update({ is_read: true })
-    .eq('user_id', userId)
-    .eq('is_read', false)
-  return { error }
-}
+export const markAllNotificationsRead = (userId) =>
+  supabase.from('notifications').update({ is_read: true }).eq('user_id', userId).eq('is_read', false)
 
 // ── Dashboard Stats ───────────────────────────────────────
 export const getBuildingStats = async (buildingId) => {
-  const [rooms, tenants, rentRecords] = await Promise.all([
-    supabase.from('rooms').select('id, is_occupied').eq('building_id', buildingId),
+  const today = new Date()
+  const prevMonth = today.getMonth() === 0 ? 12 : today.getMonth()
+  const prevYear = today.getMonth() === 0 ? today.getFullYear() - 1 : today.getFullYear()
+
+  const [roomsRes, tenantsRes, rentRes, elecRes] = await Promise.all([
+    supabase.from('rooms').select('id, is_occupied, room_number, rent_amount, floor, last_meter_reading, due_date_day').eq('building_id', buildingId),
     supabase.from('tenants').select('id').eq('building_id', buildingId).eq('is_active', true),
-    supabase
-      .from('rent_records')
-      .select('status, amount')
+    supabase.from('rent_records').select('room_id, status, amount, stay_month, stay_year, due_date, period_start, period_end, tenants(full_name)')
+      .eq('building_id', buildingId),
+    supabase.from('electricity_records').select('room_id, status, total_amount, stay_month, stay_year')
       .eq('building_id', buildingId)
-      .eq('month', new Date().getMonth() + 1)
-      .eq('year', new Date().getFullYear()),
   ])
 
-  const stats = {
-    totalRooms: rooms.data?.length || 0,
-    occupiedRooms: rooms.data?.filter((r) => r.is_occupied).length || 0,
-    totalTenants: tenants.data?.length || 0,
-    paidRent: rentRecords.data?.filter((r) => r.status === 'paid').length || 0,
-    unpaidRent: rentRecords.data?.filter((r) => r.status !== 'paid').length || 0,
-    totalRentDue: rentRecords.data
-      ?.filter((r) => r.status !== 'paid')
-      .reduce((sum, r) => sum + parseFloat(r.amount), 0) || 0,
-    totalRentCollected: rentRecords.data
-      ?.filter((r) => r.status === 'paid')
-      .reduce((sum, r) => sum + parseFloat(r.amount), 0) || 0,
-  }
+  const rooms = roomsRes.data || []
+  const allRent = rentRes.data || []
+  const allElec = elecRes.data || []
 
-  return stats
+  // Per-room ledger: find all unpaid months per room
+  const roomLedger = rooms.map(room => {
+    const roomRent = allRent.filter(r => r.room_id === room.id)
+    const roomElec = allElec.filter(e => e.room_id === room.id)
+    const unpaidRent = roomRent.filter(r => r.status !== 'paid')
+    const unpaidElec = roomElec.filter(e => e.status !== 'paid')
+    const latestRent = roomRent.find(r => r.stay_month === prevMonth && r.stay_year === prevYear)
+    const latestElec = roomElec.find(e => e.stay_month === prevMonth && e.stay_year === prevYear)
+    return {
+      ...room,
+      unpaidMonthsCount: unpaidRent.length,
+      unpaidRentAmount: unpaidRent.reduce((s, r) => s + parseFloat(r.amount || 0), 0),
+      unpaidElecAmount: unpaidElec.reduce((s, e) => s + parseFloat(e.total_amount || 0), 0),
+      latestRentStatus: latestRent?.status || null,
+      latestElecStatus: latestElec?.status || null,
+      unpaidRentMonths: unpaidRent.map(r => `${MONTHS[r.stay_month-1]} ${r.stay_year}`),
+      tenant: null // filled separately if needed
+    }
+  })
+
+  return {
+    totalRooms: rooms.length,
+    occupiedRooms: rooms.filter(r => r.is_occupied).length,
+    totalTenants: tenantsRes.data?.length || 0,
+    paidRent: allRent.filter(r => r.status === 'paid' && r.stay_month === prevMonth && r.stay_year === prevYear).length,
+    unpaidRent: allRent.filter(r => r.status !== 'paid' && r.stay_month === prevMonth && r.stay_year === prevYear).length,
+    totalRentCollected: allRent.filter(r => r.status === 'paid' && r.stay_month === prevMonth && r.stay_year === prevYear).reduce((s, r) => s + parseFloat(r.amount), 0),
+    totalRentDue: allRent.filter(r => r.status !== 'paid' && r.stay_month === prevMonth && r.stay_year === prevYear).reduce((s, r) => s + parseFloat(r.amount), 0),
+    billingMonth: prevMonth, billingYear: prevYear,
+    roomLedger
+  }
 }

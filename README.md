@@ -12,7 +12,7 @@ A full-stack property management PWA built entirely on **free-tier services**.
 | Backend Logic | Supabase RLS + Edge Functions | FREE |
 | File Storage | Supabase Storage | FREE (1GB) |
 | Scheduler | GitHub Actions (cron) | FREE |
-| WhatsApp | Twilio WhatsApp API | Paid (usage-based) |
+| WhatsApp | whatsapp-web.js | FREE workaround |
 
 ---
 
@@ -59,6 +59,7 @@ rentflow/
 │
 ├── scheduler/
 │   ├── whatsapp-notifier.js     # Main scheduler script
+│   ├── setup-whatsapp-session.js # One-time QR scan setup
 │   └── package.json
 │
 └── .github/
@@ -115,16 +116,17 @@ FUNCTION_SECRET = any-random-secret-string
    ```
 4. Deploy!
 
-### Step 4 — Twilio Setup
+### Step 4 — WhatsApp Setup (One-Time)
 
-1. Go to [twilio.com](https://www.twilio.com) → Sign up / Log in
-2. Navigate to **Console** → **Messaging** → **Services**
-3. Create a new Messaging Service and enable WhatsApp channel
-4. Approve a WhatsApp Sender Number (or use sandbox for testing)
-5. Get your credentials:
-   - **Account SID**: From Console → Account
-   - **Auth Token**: From Console → Account
-   - **WhatsApp Sender Number**: Your approved sender (format: `+1234567890`)
+Run locally on your machine:
+
+```bash
+cd scheduler
+npm install
+npm run setup
+```
+
+This opens a browser with a QR code. Scan it with the WhatsApp account you want to send messages from (ideally a dedicated number). After scanning, copy the base64 session string printed to the terminal.
 
 ### Step 5 — GitHub Secrets
 
@@ -134,9 +136,7 @@ In your GitHub repo → Settings → Secrets → Actions, add:
 |------------|-------|
 | `SUPABASE_URL` | Your Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key |
-| `TWILIO_ACCOUNT_SID` | Your Twilio Account SID |
-| `TWILIO_AUTH_TOKEN` | Your Twilio Auth Token |
-| `TWILIO_WHATSAPP_NUMBER` | Your approved WhatsApp sender number (e.g., `+1234567890`) |
+| `WA_SESSION_DATA` | Base64 session from Step 4 |
 | `FUNCTION_SECRET` | Same secret you set in Supabase Edge Functions |
 
 ### Step 6 — First Use
@@ -200,10 +200,12 @@ Calculated automatically in the database as a generated column.
 
 ## 🔧 Maintenance
 
-### Update Twilio credentials
-If your Twilio token expires or changes:
-1. Update your Twilio Auth Token in Twilio Dashboard
-2. Update the `TWILIO_AUTH_TOKEN` secret in GitHub
+### Re-authenticate WhatsApp (if session expires)
+```bash
+cd scheduler
+npm run setup
+# Re-scan QR code, update WA_SESSION_DATA secret
+```
 
 ### Manual notification run
 Go to GitHub → Actions → WhatsApp Rent Notifier → Run workflow

@@ -1,109 +1,87 @@
-// frontend/src/pages/TenantDashboard.jsx
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import {
-  getTenantByUserId,
-  getTenantRentRecords,
-  getElectricityRecords,
-  getDocuments,
-  getNotifications,
-  markAllNotificationsRead,
-  signOut,
+  getTenantByUserId, getTenantRentRecords, getTenantElectricityRecords,
+  getNotifications, markAllNotificationsRead, signOut,
+  getOwnerBuildings, getMyRoomRequests, createRoomRequest, updateRoomRequest,
+  findOwnerByCredentials
 } from '../lib/supabase'
 import DocumentManager from '../components/documents/DocumentManager'
 import NotificationPanel from '../components/notifications/NotificationPanel'
-import { useNavigate } from 'react-router-dom'
 
 const TABS = [
-  { id: 'overview', label: 'Overview', icon: '📊' },
-  { id: 'rent', label: 'Rent History', icon: '💰' },
-  { id: 'electricity', label: 'Electricity', icon: '⚡' },
-  { id: 'documents', label: 'Documents', icon: '📂' },
+  { id: 'overview',     label: 'Overview',     icon: '📊' },
+  { id: 'browse',       label: 'Browse Rooms',  icon: '🏠' },
+  { id: 'rent',         label: 'Rent History',  icon: '💰' },
+  { id: 'electricity',  label: 'Electricity',   icon: '⚡' },
+  { id: 'documents',    label: 'Documents',     icon: '📂' },
 ]
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 export default function TenantDashboard() {
   const { profile, user } = useAuth()
   const navigate = useNavigate()
   const [tenant, setTenant] = useState(null)
   const [rentRecords, setRentRecords] = useState([])
-  const [electricityRecords, setElectricityRecords] = useState([])
+  const [elecRecords, setElecRecords] = useState([])
   const [notifications, setNotifications] = useState([])
+  const [myRequests, setMyRequests] = useState([])
   const [activeTab, setActiveTab] = useState('overview')
   const [showNotifications, setShowNotifications] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadData()
-  }, [user])
+  useEffect(() => { loadAll() }, [user])
 
-  const loadData = async () => {
+  const loadAll = async () => {
     setLoading(true)
-    const [tenantRes, notifRes] = await Promise.all([
+    const [tenantRes, notifRes, reqRes] = await Promise.all([
       getTenantByUserId(user.id),
       getNotifications(user.id),
+      getMyRoomRequests(user.id)
     ])
-
     if (tenantRes.data) {
       setTenant(tenantRes.data)
       const [rentRes, elecRes] = await Promise.all([
         getTenantRentRecords(tenantRes.data.id),
-        getElectricityRecords(tenantRes.data.building_id),
+        getTenantElectricityRecords(tenantRes.data.id)
       ])
       setRentRecords(rentRes.data || [])
-      setElectricityRecords(
-        (elecRes.data || []).filter((r) => r.tenant_id === tenantRes.data.id)
-      )
+      setElecRecords(elecRes.data || [])
     }
-
     setNotifications(notifRes.data || [])
+    setMyRequests(reqRes.data || [])
     setLoading(false)
   }
 
-  const handleSignOut = async () => {
-    await signOut()
-    navigate('/login')
-  }
+  const handleSignOut = async () => { await signOut(); navigate('/login') }
+  const unreadCount = notifications.filter(n => !n.is_read).length
 
-  const unreadCount = notifications.filter((n) => !n.is_read).length
-  const currentRent = rentRecords.find(
-    (r) => r.month === new Date().getMonth() + 1 && r.year === new Date().getFullYear()
-  )
+  const currentRent = rentRecords[0]
+  const daysOverdue = currentRent?.status === 'overdue'
+    ? Math.floor((new Date() - new Date(currentRent.due_date)) / 86400000) : 0
 
-  if (loading) return <div className="page-loading">Loading your dashboard...</div>
+  if (loading) return <div className="page-loading">Loading your dashboard…</div>
 
-  if (!tenant) {
-    return (
-      <div className="empty-state full-page">
-        <h2>Account Not Linked</h2>
-        <p>Your tenant account hasn't been set up yet. Please contact your owner.</p>
-        <button className="btn-primary" onClick={handleSignOut}>Sign Out</button>
-      </div>
-    )
-  }
+  const isLinked = !!tenant
 
   return (
     <div className="tenant-layout">
       <aside className="sidebar">
         <div className="sidebar-brand"><span>🏢</span><span>RentFlow</span></div>
-
-        <div className="tenant-room-info">
-          <div className="room-badge">Room {tenant.rooms?.room_number}</div>
-          <div className="building-name">{tenant.buildings?.name}</div>
-        </div>
-
+        {isLinked && (
+          <div className="tenant-room-info">
+            <div className="room-badge">Room {tenant.rooms?.room_number}</div>
+            <div className="building-name">{tenant.buildings?.name}</div>
+          </div>
+        )}
         <nav className="sidebar-nav">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              className={`nav-item ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              <span className="nav-icon">{tab.icon}</span>
-              <span>{tab.label}</span>
+          {TABS.filter(t => isLinked || t.id === 'browse').map(tab => (
+            <button key={tab.id} className={`nav-item ${activeTab === tab.id ? 'active' : ''}`} onClick={() => setActiveTab(tab.id)}>
+              <span className="nav-icon">{tab.icon}</span><span>{tab.label}</span>
             </button>
           ))}
         </nav>
-
         <div className="sidebar-footer">
           <div className="user-info">
             <span className="user-name">{profile?.full_name}</span>
@@ -115,81 +93,59 @@ export default function TenantDashboard() {
 
       <main className="main-content">
         <header className="top-bar">
-          <h2>{TABS.find((t) => t.id === activeTab)?.icon} {TABS.find((t) => t.id === activeTab)?.label}</h2>
+          <h2>{TABS.find(t => t.id === activeTab)?.icon} {TABS.find(t => t.id === activeTab)?.label}</h2>
           <button className="notif-btn" onClick={() => setShowNotifications(true)}>
-            🔔 {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+            🔔{unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
           </button>
         </header>
 
         <div className="tab-content">
-          {activeTab === 'overview' && (
-            <TenantOverview tenant={tenant} currentRent={currentRent} />
+          {activeTab === 'overview' && isLinked && (
+            <TenantOverview tenant={tenant} currentRent={currentRent} daysOverdue={daysOverdue} />
           )}
-          {activeTab === 'rent' && (
-            <TenantRentHistory records={rentRecords} />
+          {activeTab === 'browse' && (
+            <RoomBrowser userId={user.id} profile={profile} myRequests={myRequests} onRefresh={loadAll} />
           )}
-          {activeTab === 'electricity' && (
-            <TenantElectricityHistory records={electricityRecords} />
+          {activeTab === 'rent' && isLinked && <TenantRentHistory records={rentRecords} />}
+          {activeTab === 'electricity' && isLinked && <TenantElectricityHistory records={elecRecords} />}
+          {activeTab === 'documents' && isLinked && (
+            <DocumentManager buildingId={tenant.building_id} tenantId={tenant.id} isOwner={false} uploadedBy={user.id} />
           )}
-          {activeTab === 'documents' && (
-            <DocumentManager
-              buildingId={tenant.building_id}
-              tenantId={tenant.id}
-              isOwner={false}
-              uploadedBy={user.id}
-            />
+          {!isLinked && activeTab !== 'browse' && (
+            <div className="empty-state">
+              <h3>Account Not Yet Linked</h3>
+              <p>Your owner hasn't assigned you a room yet, or your request is pending approval.</p>
+              <button className="btn-primary" onClick={() => setActiveTab('browse')}>🏠 Browse Available Rooms</button>
+            </div>
           )}
         </div>
       </main>
 
       {showNotifications && (
-        <NotificationPanel
-          notifications={notifications}
-          onClose={() => setShowNotifications(false)}
-          onMarkAllRead={async () => {
-            await markAllNotificationsRead(user.id)
-            loadData()
-          }}
-          onRefresh={loadData}
-        />
+        <NotificationPanel notifications={notifications} onClose={() => setShowNotifications(false)}
+          onMarkAllRead={async () => { await markAllNotificationsRead(user.id); loadAll() }}
+          onRefresh={loadAll} />
       )}
     </div>
   )
 }
 
-function TenantOverview({ tenant, currentRent }) {
-  const daysOverdue = currentRent?.status === 'overdue'
-    ? Math.floor((new Date() - new Date(currentRent.due_date)) / 86400000)
-    : 0
-
+function TenantOverview({ tenant, currentRent, daysOverdue }) {
   return (
-    <div className="tenant-overview">
-      <div className="info-cards">
-        <div className="info-card">
-          <div className="info-label">Building</div>
-          <div className="info-value">{tenant.buildings?.name}</div>
-          <div className="info-sub">{tenant.buildings?.address}</div>
+    <div className="info-cards">
+      <div className="info-card"><div className="info-label">Building</div><div className="info-value">{tenant.buildings?.name}</div><div className="info-sub">{tenant.buildings?.address}</div></div>
+      <div className="info-card"><div className="info-label">Room</div><div className="info-value">Room {tenant.rooms?.room_number}</div>{tenant.rooms?.floor && <div className="info-sub">Floor: {tenant.rooms.floor}</div>}</div>
+      <div className="info-card"><div className="info-label">Monthly Rent</div><div className="info-value">₹{parseFloat(tenant.rooms?.rent_amount || 0).toLocaleString('en-IN')}</div></div>
+      <div className={`info-card ${currentRent?.status === 'paid' ? 'card-success' : currentRent?.status === 'overdue' ? 'card-danger' : 'card-warning'}`}>
+        <div className="info-label">Latest Bill Status</div>
+        <div className="info-value">
+          {!currentRent && 'No bill yet'}
+          {currentRent?.status === 'paid' && '✅ Paid'}
+          {currentRent?.status === 'unpaid' && '⏳ Pending'}
+          {currentRent?.status === 'overdue' && `⚠️ ${daysOverdue} day(s) overdue`}
         </div>
-        <div className="info-card">
-          <div className="info-label">Room</div>
-          <div className="info-value">Room {tenant.rooms?.room_number}</div>
-        </div>
-        <div className="info-card">
-          <div className="info-label">Monthly Rent</div>
-          <div className="info-value">₹{parseFloat(tenant.rooms?.rent_amount || 0).toLocaleString()}</div>
-        </div>
-        <div className={`info-card ${currentRent?.status === 'paid' ? 'card-success' : currentRent?.status === 'overdue' ? 'card-danger' : 'card-warning'}`}>
-          <div className="info-label">This Month's Status</div>
-          <div className="info-value">
-            {!currentRent && 'Not Generated'}
-            {currentRent?.status === 'paid' && '✅ Paid'}
-            {currentRent?.status === 'unpaid' && '⏳ Due Soon'}
-            {currentRent?.status === 'overdue' && `⚠️ ${daysOverdue} day(s) overdue`}
-          </div>
-          {currentRent && (
-            <div className="info-sub">Due: {new Date(currentRent.due_date).toLocaleDateString('en-IN')}</div>
-          )}
-        </div>
+        {currentRent && <div className="info-sub">Period: {new Date(currentRent.period_start).toLocaleDateString('en-IN')} → {new Date(currentRent.period_end).toLocaleDateString('en-IN')}</div>}
+        {currentRent && <div className="info-sub">Due: {new Date(currentRent.due_date).toLocaleDateString('en-IN')}</div>}
       </div>
     </div>
   )
@@ -197,27 +153,49 @@ function TenantOverview({ tenant, currentRent }) {
 
 function TenantRentHistory({ records }) {
   return (
-    <div className="rent-history">
+    <div>
+      <div className="info-banner" style={{ marginBottom: 16 }}>📋 Rent history — format: paid from DD-MM-YYYY to DD-MM-YYYY (postpaid)</div>
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead><tr><th>Period (Stay)</th><th>Amount</th><th>Due Date</th><th>Paid On</th><th>Method</th><th>Status</th></tr></thead>
+          <tbody>
+            {records.length === 0 && <tr><td colSpan={6} className="empty-row">No rent records yet.</td></tr>}
+            {records.map(r => (
+              <tr key={r.id} className={r.status==='overdue'?'row-danger':r.status==='paid'?'row-success':''}>
+                <td className="period-cell">
+                  {r.period_start ? new Date(r.period_start).toLocaleDateString('en-IN') : '—'}
+                  {' → '}
+                  {r.period_end ? new Date(r.period_end).toLocaleDateString('en-IN') : '—'}
+                </td>
+                <td>₹{parseFloat(r.amount).toLocaleString('en-IN')}</td>
+                <td>{new Date(r.due_date).toLocaleDateString('en-IN')}</td>
+                <td>{r.paid_date ? new Date(r.paid_date).toLocaleDateString('en-IN') : '—'}</td>
+                <td>{r.payment_method || '—'}</td>
+                <td><span className={`badge badge-${r.status}`}>{r.status}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function TenantElectricityHistory({ records }) {
+  return (
+    <div className="table-wrap">
       <table className="data-table">
-        <thead>
-          <tr>
-            <th>Month/Year</th>
-            <th>Amount</th>
-            <th>Due Date</th>
-            <th>Paid On</th>
-            <th>Status</th>
-          </tr>
-        </thead>
+        <thead><tr><th>Period</th><th>Prev</th><th>Current</th><th>Units</th><th>Rate</th><th>Amount</th><th>Status</th></tr></thead>
         <tbody>
-          {records.length === 0 && (
-            <tr><td colSpan={5} className="empty-row">No rent records yet</td></tr>
-          )}
-          {records.map((r) => (
-            <tr key={r.id}>
-              <td>{new Date(r.year, r.month - 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' })}</td>
-              <td>₹{parseFloat(r.amount).toLocaleString()}</td>
-              <td>{new Date(r.due_date).toLocaleDateString('en-IN')}</td>
-              <td>{r.paid_date ? new Date(r.paid_date).toLocaleDateString('en-IN') : '—'}</td>
+          {records.length === 0 && <tr><td colSpan={7} className="empty-row">No electricity records yet.</td></tr>}
+          {records.map(r => (
+            <tr key={r.id} className={r.status==='overdue'?'row-danger':r.status==='paid'?'row-success':''}>
+              <td className="period-cell">
+                {r.period_start ? new Date(r.period_start).toLocaleDateString('en-IN') : '—'} → {r.period_end ? new Date(r.period_end).toLocaleDateString('en-IN') : '—'}
+              </td>
+              <td>{r.previous_reading}</td><td>{r.current_reading}</td>
+              <td>{r.units_consumed}</td><td>₹{r.rate_per_unit}/unit</td>
+              <td>₹{parseFloat(r.total_amount).toLocaleString('en-IN')}</td>
               <td><span className={`badge badge-${r.status}`}>{r.status}</span></td>
             </tr>
           ))}
@@ -227,36 +205,127 @@ function TenantRentHistory({ records }) {
   )
 }
 
-function TenantElectricityHistory({ records }) {
+// ── Room Browser for tenants ──────────────────────────────
+function RoomBrowser({ userId, profile, myRequests, onRefresh }) {
+  const [ownerEmail, setOwnerEmail] = useState('')
+  const [ownerPhone, setOwnerPhone] = useState('')
+  const [ownerData, setOwnerData] = useState(null)
+  const [buildings, setBuildings] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [requestMessage, setRequestMessage] = useState('')
+  const [requesting, setRequesting] = useState(null) // roomId being requested
+
+  const activePendingRequest = myRequests.find(r => r.status === 'pending')
+
+  const handleFindOwner = async () => {
+    if (!ownerEmail || !ownerPhone) { setError('Enter both email and phone'); return }
+    setError(''); setLoading(true)
+    const { data: owners } = await findOwnerByCredentials(ownerEmail, ownerPhone)
+    if (!owners?.length) { setError('Owner not found. Check credentials.'); setLoading(false); return }
+    const owner = owners[0]
+    setOwnerData(owner)
+    const { data: bldgs } = await getOwnerBuildings(owner.owner_id)
+    setBuildings(bldgs || [])
+    setLoading(false)
+  }
+
+  const handleRequestRoom = async (room, buildingId, ownerId) => {
+    if (activePendingRequest) { alert('You already have a pending request. Withdraw it first.'); return }
+    setRequesting(room.id)
+    await createRoomRequest({ tenantUserId: userId, roomId: room.id, buildingId, ownerId, message: requestMessage })
+    setRequesting(null); setRequestMessage(''); onRefresh()
+  }
+
+  const handleWithdraw = async (requestId) => {
+    await updateRoomRequest(requestId, 'withdrawn')
+    onRefresh()
+  }
+
   return (
-    <div className="electricity-history">
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th>Month/Year</th>
-            <th>Previous</th>
-            <th>Current</th>
-            <th>Units</th>
-            <th>Rate</th>
-            <th>Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {records.length === 0 && (
-            <tr><td colSpan={6} className="empty-row">No electricity records yet</td></tr>
-          )}
-          {records.map((r) => (
-            <tr key={r.id}>
-              <td>{new Date(r.year, r.month - 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' })}</td>
-              <td>{r.previous_reading}</td>
-              <td>{r.current_reading}</td>
-              <td>{r.units_consumed}</td>
-              <td>₹{r.rate_per_unit}/unit</td>
-              <td>₹{parseFloat(r.total_amount).toLocaleString()}</td>
-            </tr>
+    <div className="room-browser">
+      <div className="info-banner" style={{ marginBottom: 16 }}>
+        🏠 Browse available rooms. Enter your owner's credentials to see their buildings and apply for a vacant room.
+      </div>
+
+      {/* My requests */}
+      {myRequests.length > 0 && (
+        <div className="my-requests-section">
+          <h4>My Room Requests</h4>
+          {myRequests.map(req => (
+            <div key={req.id} className={`request-card status-${req.status}`}>
+              <div className="request-header">
+                <div>
+                  <div className="request-room">Room {req.rooms?.room_number} · {req.buildings?.name}</div>
+                  <div className="request-date">{new Date(req.created_at).toLocaleDateString('en-IN')}</div>
+                </div>
+                <span className={`badge badge-${req.status}`}>{req.status}</span>
+              </div>
+              {req.status === 'pending' && (
+                <button className="btn-sm btn-danger-outline" onClick={() => handleWithdraw(req.id)}>Withdraw Request</button>
+              )}
+            </div>
           ))}
-        </tbody>
-      </table>
+        </div>
+      )}
+
+      {/* Owner lookup */}
+      <div className="card-form">
+        <h4>Find Owner's Buildings</h4>
+        <div className="form-row">
+          <div className="form-group">
+            <label>Owner's Email</label>
+            <input type="email" placeholder="owner@email.com" value={ownerEmail} onChange={e => setOwnerEmail(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label>Owner's Phone</label>
+            <input type="tel" placeholder="9876543210" value={ownerPhone} onChange={e => setOwnerPhone(e.target.value.replace(/\D/g,'').slice(0,10))} maxLength={10} />
+          </div>
+        </div>
+        {error && <div className="error-msg">{error}</div>}
+        <button className="btn-primary" onClick={handleFindOwner} disabled={loading}>{loading ? 'Searching…' : '🔍 Find Owner'}</button>
+      </div>
+
+      {/* Buildings + rooms */}
+      {ownerData && (
+        <div className="buildings-browse">
+          <h4>Buildings by {ownerData.owner_name}</h4>
+          {buildings.map(building => (
+            <div key={building.id} className="building-browse-card">
+              <div className="building-browse-header">
+                <span className="building-name">{building.name}</span>
+                {building.address && <span className="building-address">{building.address}</span>}
+              </div>
+              <div className="rooms-browse-grid">
+                {(building.rooms || []).map(room => {
+                  const myReqForRoom = myRequests.find(r => r.room_id === room.id && r.status === 'pending')
+                  return (
+                    <div key={room.id} className={`room-browse-card ${room.is_occupied ? 'occupied' : 'vacant'}`}>
+                      <div className="rb-room">Room {room.room_number}</div>
+                      {room.floor && <div className="rb-floor">Floor {room.floor}</div>}
+                      <div className="rb-rent">₹{parseFloat(room.rent_amount).toLocaleString('en-IN')}/mo</div>
+                      <div className={`rb-status ${room.is_occupied ? 'occupied' : 'vacant'}`}>
+                        {room.is_occupied ? '🔴 Occupied' : '🟢 Vacant'}
+                      </div>
+                      {!room.is_occupied && !myReqForRoom && (
+                        <div className="rb-request">
+                          <input placeholder="Message (optional)" value={requesting === room.id ? requestMessage : ''} onChange={e => setRequestMessage(e.target.value)} className="rb-msg-input" />
+                          <button className="btn-sm btn-success" onClick={() => handleRequestRoom(room, building.id, ownerData.owner_id)} disabled={requesting === room.id || !!activePendingRequest}>
+                            {requesting === room.id ? 'Sending…' : 'Apply for Room'}
+                          </button>
+                          {activePendingRequest && <div className="field-hint">Withdraw existing request first</div>}
+                        </div>
+                      )}
+                      {myReqForRoom && <div className="rb-pending">⏳ Request Pending</div>}
+                    </div>
+                  )
+                })}
+                {(!building.rooms || building.rooms.length === 0) && <div className="text-muted">No rooms added yet.</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
