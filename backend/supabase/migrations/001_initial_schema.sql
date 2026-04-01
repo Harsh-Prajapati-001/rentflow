@@ -48,7 +48,7 @@ DROP TABLE IF EXISTS profiles            CASCADE;
 -- must NOT delete financial history. Buildings/tenants remain.
 -- ============================================================
 CREATE TABLE profiles (
-  id        UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE SET NULL,
+  id        UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name TEXT    NOT NULL,
   phone     TEXT,
   role      TEXT    NOT NULL CHECK (role IN ('owner','tenant')),
