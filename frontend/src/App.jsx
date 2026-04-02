@@ -1,15 +1,3 @@
-// frontend/src/App.jsx
-//
-// FIX: Gemini Issue #1 Part 2 — Fatal Fallback / Infinite Loop in ProtectedRoute
-//
-// Root cause: ProtectedRoute evaluated role when profile was still null.
-// profile?.role = undefined → undefined !== 'owner' → redirect to /tenant
-// → caught again → infinite loop.
-//
-// Fix: ProtectedRoute now shows a loading spinner if loading is true OR
-// if user exists but profile hasn't arrived yet. It only evaluates the role
-// once BOTH user and profile are confirmed to be in a settled state.
-
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Component } from 'react'
 import { AuthProvider, useAuth } from './hooks/useAuth'
@@ -19,8 +7,7 @@ import OwnerDashboard from './pages/OwnerDashboard'
 import TenantDashboard from './pages/TenantDashboard'
 import './styles/global.css'
 
-// ── Error Boundary ────────────────────────────────────────
-// Shows the real error on screen instead of a white blank page
+// ── Error boundary ────────────────────────────────────────
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null } }
   static getDerivedStateFromError(err) { return { error: err } }
@@ -48,7 +35,7 @@ class ErrorBoundary extends Component {
             Reload Page
           </button>
           <p style={{ marginTop: 12, fontSize: 12, color: '#8892a4' }}>
-            Check that VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in Vercel environment variables.
+            Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel environment variables.
           </p>
         </div>
       )
@@ -57,45 +44,38 @@ class ErrorBoundary extends Component {
   }
 }
 
-// ── Protected Route ───────────────────────────────────────
+// ── Protected route ───────────────────────────────────────
 function ProtectedRoute({ children, role }) {
   const { user, profile, loading } = useAuth()
 
-  // CRITICAL FIX: Keep showing the spinner if:
-  // (a) we are still loading, OR
-  // (b) user exists but profile hasn't been fetched yet
-  // This is exactly the intermediate state that caused the infinite loop.
-  // We must NOT evaluate role until profile is confirmed.
-  if (loading || (user && profile === null)) {
-    return <div className="page-loading">Loading…</div>
-  }
+  // Show spinner while auth state is being resolved.
+  // loading=true means we haven't heard back from Supabase yet — do NOT route.
+  if (loading) return <div className="page-loading">Loading…</div>
 
-  // No user at all → send to login
+  // Not logged in → go to login
   if (!user) return <Navigate to="/login" replace />
 
-  // User exists AND profile is loaded → now safe to check role
-  if (role && profile?.role !== role) {
-    // User is logged in but wrong role for this route
-    // Send them to their correct dashboard
-    const correctPath = profile?.role === 'owner' ? '/owner' : '/tenant'
-    return <Navigate to={correctPath} replace />
+  // Logged in but profile not yet fetched (shouldn't happen with new useAuth,
+  // but guard just in case)
+  if (!profile) return <div className="page-loading">Loading…</div>
+
+  // Wrong role for this route → redirect to correct dashboard
+  if (role && profile.role !== role) {
+    return <Navigate to={profile.role === 'owner' ? '/owner' : '/tenant'} replace />
   }
 
   return children
 }
 
-// ── App Routes ────────────────────────────────────────────
+// ── Routes ────────────────────────────────────────────────
 function AppRoutes() {
   const { user, profile, loading } = useAuth()
 
-  // Same guard: don't redirect until we know both user and profile
-  if (loading || (user && profile === null)) {
-    return <div className="page-loading">Loading…</div>
-  }
+  // Block routing until auth is fully resolved
+  if (loading) return <div className="page-loading">Loading…</div>
 
   return (
     <Routes>
-      {/* Public route: login page */}
       <Route
         path="/login"
         element={
@@ -104,8 +84,6 @@ function AppRoutes() {
             : <AuthPage />
         }
       />
-
-      {/* Owner-only routes */}
       <Route
         path="/owner/*"
         element={
@@ -116,8 +94,6 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-
-      {/* Tenant-only routes */}
       <Route
         path="/tenant/*"
         element={
@@ -126,8 +102,6 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-
-      {/* Catch-all → login */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   )
