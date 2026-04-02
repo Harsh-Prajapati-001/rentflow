@@ -1,9 +1,27 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+// If env vars are missing, show a clear error in the UI instead of crashing silently
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('⚠️ Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY - add to Vercel env vars')
+  document.getElementById('root').innerHTML = `
+    <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;
+      justify-content:center;padding:32px;background:#0f1117;color:#e2e8f0;font-family:monospace">
+      <div style="font-size:2rem;margin-bottom:16px">⚠️</div>
+      <h2 style="color:#ef4444;margin-bottom:12px">Missing Environment Variables</h2>
+      <p style="color:#8892a4;margin-bottom:20px;text-align:center;max-width:500px">
+        VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are not set.<br/><br/>
+        Go to Vercel → your project → Settings → Environment Variables
+        and add both values, then redeploy.
+      </p>
+      <code style="background:#1a1d27;padding:12px 20px;border-radius:8px;color:#f59e0b;font-size:13px">
+        VITE_SUPABASE_URL = https://xxxx.supabase.co<br/>
+        VITE_SUPABASE_ANON_KEY = eyJ...
+      </code>
+    </div>
+  `
+  throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY environment variables')
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
