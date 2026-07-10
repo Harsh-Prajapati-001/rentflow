@@ -1,16 +1,11 @@
+// backend/supabase/functions/generate-monthly-rents/index.ts
 // Supabase Edge Function — generate-monthly-rents
-// FIX: Gemini Issue #2 — Schema mismatches corrected:
-//   - due_date    → due_date_day  (correct column name)
-//   - month/year  → stay_month/stay_year (correct column names)
-//   - period_start and period_end now included (NOT NULL in schema)
-// POSTPAID: bill for last month's stay, due this month
-
+// Generates postpaid rent records for the completed stay month, due in the following month.
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405 })
-
   const authHeader = req.headers.get('Authorization')
   if (authHeader !== `Bearer ${Deno.env.get('FUNCTION_SECRET')}`) {
     return new Response('Unauthorized', { status: 401 })
@@ -22,13 +17,12 @@ serve(async (req) => {
   )
 
   const today = new Date()
-
-  // POSTPAID: bill for the month that just completed
-  // Running on April 1 → billing for March (stay_month=3)
+  // POSTPAID billing: bill for the month that just completed
+  // E.g., Running on April 1st -> stayMonth is 3 (March), stayYear is 2026
   const stayMonth = today.getMonth() === 0 ? 12 : today.getMonth()
-  const stayYear  = today.getMonth() === 0 ? today.getFullYear() - 1 : today.getFullYear()
+  const stayYear = today.getMonth() === 0 ? today.getFullYear() - 1 : today.getFullYear()
 
-  // FIX: correct column name is due_date_day (not due_date)
+  // Fetch active tenants that are assigned to a room
   const { data: tenants, error } = await supabase
     .from('tenants')
     .select('id, room_id, building_id, rooms(rent_amount, due_date_day)')
@@ -48,40 +42,44 @@ serve(async (req) => {
       .from('rent_records')
       .select('id')
       .eq('tenant_id', tenant.id)
-      .eq('stay_month', stayMonth)   // FIX: stay_month not month
-      .eq('stay_year', stayYear)     // FIX: stay_year not year
+      .eq('stay_month', stayMonth)
+      .eq('stay_year', stayYear)
       .maybeSingle()
 
-    if (existing) { skipped++; continue }
+    if (existing) {
+      skipped++
+      continue
+    }
 
-    // FIX: correct column name due_date_day
-    const dueDay   = (tenant.rooms as any)?.due_date_day ?? 5
+    const dueDay = (tenant.rooms as any)?.due_date_day ?? 5
     const dueMonth = stayMonth === 12 ? 1 : stayMonth + 1
-    const dueYear  = stayMonth === 12 ? stayYear + 1 : stayYear
+    const dueYear = stayMonth === 12 ? stayYear + 1 : stayYear
 
-    // FIX: period_start and period_end are NOT NULL — must always be provided
     const periodStart = new Date(stayYear, stayMonth - 1, 1)
-    const periodEnd   = new Date(stayYear, stayMonth, 0)  // last day of stay month
-    const dueDate     = new Date(dueYear, dueMonth - 1, dueDay)
+    const periodEnd = new Date(stayYear, stayMonth, 0) // Last day of stay month
+    const dueDate = new Date(dueYear, dueMonth - 1, dueDay)
 
     const { error: insertErr } = await supabase.from('rent_records').insert({
-      tenant_id:    tenant.id,
-      room_id:      tenant.room_id,
-      building_id:  tenant.building_id,
-      stay_month:   stayMonth,          // FIX: stay_month
-      stay_year:    stayYear,           // FIX: stay_year
-      period_start: periodStart.toISOString().split('T')[0],  // FIX: NOT NULL
-      period_end:   periodEnd.toISOString().split('T')[0],    // FIX: NOT NULL
-      amount:       (tenant.rooms as any)?.rent_amount ?? 0,
-      due_date:     dueDate.toISOString().split('T')[0],
-      status:       'unpaid',
+      tenant_id: tenant.id,
+      room_id: tenant.room_id,
+      building_id: tenant.building_id,
+      stay_month: stayMonth,
+      stay_year: stayYear,
+      period_start: periodStart.toISOString().split('T')[0],
+      period_end: periodEnd.toISOString().split('T')[0],
+      amount: (tenant.rooms as any)?.rent_amount ?? 0,
+      due_date: dueDate.toISOString().split('T')[0],
+      status: 'unpaid'
     })
 
-    if (!insertErr) created++
-    else console.error('Insert error for tenant', tenant.id, insertErr.message)
+    if (!insertErr) {
+      created++
+    } else {
+      console.error('Insert error for tenant', tenant.id, insertErr.message)
+    }
   }
 
-  // Also mark any past-due unpaid records as overdue
+  // Auto-mark overdue rent records
   await supabase
     .from('rent_records')
     .update({ status: 'overdue' })
