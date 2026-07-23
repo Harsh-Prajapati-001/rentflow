@@ -205,7 +205,7 @@ export default function AuthPage() {
       <div className="auth-page">
         <div className="auth-card" style={{ position: 'relative' }}>
           <div style={{ position: 'absolute', top: 20, right: 20 }}><ThemeToggle /></div>
-          <div className="auth-brand"><span className="brand-icon">🏢</span><h1>RentFlow</h1></div>
+          <div className="auth-brand"><img src="/logo.svg" alt="RentFlow Logo" className="brand-icon" /><h1>RentFlow</h1></div>
           <div className="verify-box">
             <div className="verify-icon">📱</div>
             <h2>Verify Your Phone</h2>
@@ -248,7 +248,7 @@ export default function AuthPage() {
       <div className="auth-page">
         <div className="auth-card" style={{ position: 'relative' }}>
           <div style={{ position: 'absolute', top: 20, right: 20 }}><ThemeToggle /></div>
-          <div className="auth-brand"><span className="brand-icon">🏢</span><h1>RentFlow</h1></div>
+          <div className="auth-brand"><img src="/logo.svg" alt="RentFlow Logo" className="brand-icon" /><h1>RentFlow</h1></div>
           <div className="verify-box">
             <div className="verify-icon">📧</div>
             <h2>Check Your Email</h2>
@@ -276,7 +276,7 @@ export default function AuthPage() {
       <div className="auth-card" style={{ position: 'relative' }}>
         <div style={{ position: 'absolute', top: 20, right: 20 }}><ThemeToggle /></div>
         <div className="auth-brand">
-          <span className="brand-icon">🏢</span>
+          <img src="/logo.svg" alt="RentFlow Logo" className="brand-icon" />
           <h1>RentFlow</h1>
           <p>Property Management, Simplified</p>
         </div>

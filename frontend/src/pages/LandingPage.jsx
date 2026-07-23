@@ -16,7 +16,7 @@ export default function LandingPage() {
     <div className="landing-page">
       <nav className="landing-nav">
         <div className="landing-brand">
-          <span className="brand-icon">✨</span>
+          <img src="/logo.svg" alt="RentFlow Logo" style={{ height: '32px' }} />
           RentFlow
         </div>
         <div className="landing-nav-actions">
