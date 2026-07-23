@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { useTheme } from '../hooks/useTheme'
 import {
   getTenantByUserId, getTenantRentRecords, getTenantElectricityRecords,
   getNotifications, markAllNotificationsRead, signOut,
@@ -21,6 +22,7 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 
 export default function TenantDashboard() {
   const { profile, user } = useAuth()
+  const { isDarkMode, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const [tenant, setTenant] = useState(null)
   const [rentRecords, setRentRecords] = useState([])
@@ -83,6 +85,10 @@ export default function TenantDashboard() {
           ))}
         </nav>
         <div className="sidebar-footer">
+          <button className="theme-toggle-btn" onClick={toggleTheme} title="Toggle Dark Mode">
+            <span className="icon">{isDarkMode ? '☀️' : '🌙'}</span>
+            <span>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+          </button>
           <div className="user-info">
             <span className="user-name">{profile?.full_name}</span>
             <span className="user-role">Tenant</span>

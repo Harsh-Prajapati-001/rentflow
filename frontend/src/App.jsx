@@ -5,6 +5,8 @@ import { BuildingProvider } from './hooks/useBuilding'
 import AuthPage from './pages/AuthPage'
 import OwnerDashboard from './pages/OwnerDashboard'
 import TenantDashboard from './pages/TenantDashboard'
+import LandingPage from './pages/LandingPage'
+import { ThemeProvider } from './hooks/useTheme'
 import './styles/global.css'
 
 // ── Error boundary ────────────────────────────────────────
@@ -76,6 +78,7 @@ function AppRoutes() {
 
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
       <Route
         path="/login"
         element={
@@ -112,9 +115,11 @@ export default function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <AppRoutes />
+          </AuthProvider>
+        </ThemeProvider>
       </BrowserRouter>
     </ErrorBoundary>
   )
