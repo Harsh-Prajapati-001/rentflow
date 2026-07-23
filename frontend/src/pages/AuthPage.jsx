@@ -21,13 +21,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, signIn, signUp, findOwnerByCredentials } from '../lib/supabase'
-import { useTheme } from '../hooks/useTheme'
+import ThemeToggle from '../components/ThemeToggle'
 
 const TWILIO_ENABLED = import.meta.env.VITE_TWILIO_ENABLED === 'true'
 
 export default function AuthPage() {
   const navigate = useNavigate()
-  const { isDarkMode, toggleTheme } = useTheme()
 
   // mode: 'login' | 'signup' | 'phone_otp' | 'email_sent'
   const [mode, setMode] = useState('login')
@@ -205,9 +204,7 @@ export default function AuthPage() {
     return (
       <div className="auth-page">
         <div className="auth-card" style={{ position: 'relative' }}>
-          <button className="theme-toggle-btn" onClick={toggleTheme} style={{ position: 'absolute', top: 20, right: 20 }}>
-            {isDarkMode ? '☀️' : '🌙'}
-          </button>
+          <div style={{ position: 'absolute', top: 20, right: 20 }}><ThemeToggle /></div>
           <div className="auth-brand"><span className="brand-icon">🏢</span><h1>RentFlow</h1></div>
           <div className="verify-box">
             <div className="verify-icon">📱</div>
@@ -250,9 +247,7 @@ export default function AuthPage() {
     return (
       <div className="auth-page">
         <div className="auth-card" style={{ position: 'relative' }}>
-          <button className="theme-toggle-btn" onClick={toggleTheme} style={{ position: 'absolute', top: 20, right: 20 }}>
-            {isDarkMode ? '☀️' : '🌙'}
-          </button>
+          <div style={{ position: 'absolute', top: 20, right: 20 }}><ThemeToggle /></div>
           <div className="auth-brand"><span className="brand-icon">🏢</span><h1>RentFlow</h1></div>
           <div className="verify-box">
             <div className="verify-icon">📧</div>
@@ -279,9 +274,7 @@ export default function AuthPage() {
   return (
     <div className="auth-page">
       <div className="auth-card" style={{ position: 'relative' }}>
-        <button className="theme-toggle-btn" onClick={toggleTheme} style={{ position: 'absolute', top: 20, right: 20 }}>
-          {isDarkMode ? '☀️' : '🌙'}
-        </button>
+        <div style={{ position: 'absolute', top: 20, right: 20 }}><ThemeToggle /></div>
         <div className="auth-brand">
           <span className="brand-icon">🏢</span>
           <h1>RentFlow</h1>

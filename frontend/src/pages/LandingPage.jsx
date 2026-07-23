@@ -1,12 +1,11 @@
 import React from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { useTheme } from '../hooks/useTheme';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function LandingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isDarkMode, toggleTheme } = useTheme();
 
   // Redirect to dashboard if already logged in
   if (user) {
@@ -21,9 +20,7 @@ export default function LandingPage() {
           RentFlow
         </div>
         <div className="landing-nav-actions">
-          <button className="theme-toggle-btn" onClick={toggleTheme} aria-label="Toggle theme" title="Toggle Dark Mode">
-            {isDarkMode ? '☀️' : '🌙'}
-          </button>
+          <ThemeToggle />
           <button className="btn-primary" onClick={() => navigate('/login')}>
             Sign In
           </button>

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useBuilding } from '../hooks/useBuilding'
-import { useTheme } from '../hooks/useTheme'
+import ThemeToggle from '../components/ThemeToggle'
 import { getBuildingStats, getNotifications, markAllNotificationsRead, autoGenerateRentRecords, signOut } from '../lib/supabase'
 import BuildingSelector from '../components/buildings/BuildingSelector'
 import BuildingManager from '../components/buildings/BuildingManager'
@@ -25,7 +25,6 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 
 export default function OwnerDashboard() {
   const { profile, user } = useAuth()
-  const { isDarkMode, toggleTheme } = useTheme()
   const { selectedBuilding } = useBuilding()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -69,10 +68,7 @@ export default function OwnerDashboard() {
           ))}
         </nav>
         <div className="sidebar-footer">
-          <button className="theme-toggle-btn" onClick={toggleTheme} title="Toggle Dark Mode">
-            <span className="icon">{isDarkMode ? '☀️' : '🌙'}</span>
-            <span>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
-          </button>
+          <ThemeToggle />
           <button className="nav-item" onClick={() => setShowBuildingManager(true)}>
             <span>⚙️</span><span>Manage Buildings</span>
           </button>
