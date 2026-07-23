@@ -30,6 +30,7 @@ export default function AuthPage() {
 
   // mode: 'login' | 'signup' | 'phone_otp' | 'email_sent'
   const [mode, setMode] = useState('login')
+  const [showPassword, setShowPassword] = useState(false)
   const [role, setRole]   = useState('tenant')
 
   const [form, setForm] = useState({
@@ -295,7 +296,12 @@ export default function AuthPage() {
             </div>
             <div className="form-group">
               <label>Password</label>
-              <input type="password" placeholder="••••••••" value={form.password} onChange={e => set('password', e.target.value)} required minLength={6} />
+              <div style={{ position: 'relative' }}>
+                <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={form.password} onChange={e => set('password', e.target.value)} required minLength={6} style={{ paddingRight: '40px' }} />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '1.2rem', opacity: 0.6 }} title={showPassword ? "Hide password" : "Show password"}>
+                  {showPassword ? '🙈' : '👁️'}
+                </button>
+              </div>
             </div>
             {error && <div className="auth-message error">{error}</div>}
             <button type="submit" className="btn-primary" disabled={loading}>
@@ -346,7 +352,12 @@ export default function AuthPage() {
 
             <div className="form-group">
               <label>Password (min 6 characters)</label>
-              <input type="password" placeholder="••••••••" value={form.password} onChange={e => set('password', e.target.value)} required minLength={6} />
+              <div style={{ position: 'relative' }}>
+                <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={form.password} onChange={e => set('password', e.target.value)} required minLength={6} style={{ paddingRight: '40px' }} />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '1.2rem', opacity: 0.6 }} title={showPassword ? "Hide password" : "Show password"}>
+                  {showPassword ? '🙈' : '👁️'}
+                </button>
+              </div>
             </div>
 
             {/* Tenant owner lookup */}
