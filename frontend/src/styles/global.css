@@ -63,15 +63,27 @@ body.dark-theme .notif-drawer { background: rgba(22,25,36,.95); }
 body.dark-theme ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); }
 body.dark-theme ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.25); }
 
+/* User requested no gradients and solid colors in dark mode */
+body.dark-theme .auth-brand h1,
+body.dark-theme .sidebar-brand,
+body.dark-theme .room-badge,
+body.dark-theme .landing-brand,
+body.dark-theme .hero-content h1 span {
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
+  color: #fff;
+}
+
 html{background:var(--bg-1)}
 
 body{
   font-family:'Inter',-apple-system,sans-serif;
   color:var(--text);min-height:100vh;font-size:14px;
   background:
-    radial-gradient(ellipse 800px 600px at 8% -5%, rgba(124,58,237,.14), transparent 55%),
-    radial-gradient(ellipse 750px 650px at 105% 8%, rgba(244,119,44,.16), transparent 55%),
-    radial-gradient(ellipse 900px 700px at 50% 115%, rgba(225,48,108,.12), transparent 55%),
+    radial-gradient(ellipse 800px 600px at 8% -5%, rgba(124,58,237,.35), transparent 55%),
+    radial-gradient(ellipse 750px 650px at 105% 8%, rgba(244,119,44,.35), transparent 55%),
+    radial-gradient(ellipse 900px 700px at 50% 115%, rgba(225,48,108,.35), transparent 55%),
     linear-gradient(160deg,var(--bg-1) 0%,var(--bg-2) 50%,var(--bg-3) 100%);
   background-attachment:fixed;
 }
@@ -131,6 +143,21 @@ h1,h2,h3,h4,.auth-brand h1,.sidebar-brand,.top-bar h2{
   width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);
   display:flex;flex-direction:column;padding:16px 12px;gap:6px;position:sticky;top:0;height:100vh;overflow-y:auto;
   backdrop-filter:blur(var(--glass-blur)) saturate(180%);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(180%);
+  transition: width 0.3s ease;
+}
+.sidebar.collapsed {
+  width: 76px;
+  padding: 16px 8px;
+}
+.sidebar.collapsed .sidebar-brand span:last-child,
+.sidebar.collapsed .nav-item span:last-child,
+.sidebar.collapsed .user-info,
+.sidebar.collapsed .building-selector {
+  display: none;
+}
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: 12px 0;
 }
 .sidebar-brand{display:flex;align-items:center;gap:10px;padding:8px 12px;font-weight:700;font-size:1.15rem;margin-bottom:4px;
   background:var(--accent-grad);-webkit-background-clip:text;background-clip:text;color:transparent}
@@ -160,6 +187,7 @@ h1,h2,h3,h4,.auth-brand h1,.sidebar-brand,.top-bar h2{
 }
 .top-bar h2{font-size:1.1rem;font-weight:700}
 .top-bar-right{display:flex;align-items:center;gap:10px}
+.sidebar-toggle{background:transparent;border:none;color:var(--text-muted);cursor:pointer;font-size:1.2rem;display:flex;align-items:center;padding:4px;margin-right:12px}
 .page-title{display:flex;align-items:center}
 .building-badge{font-size:.75rem;color:var(--accent2);background:rgba(244,119,44,.1);border:1px solid rgba(244,119,44,.25);padding:2px 10px;border-radius:20px;margin-left:10px}
 .tab-content{padding:24px;flex:1;overflow-y:auto}
@@ -253,7 +281,7 @@ input.input-disabled,input:disabled{opacity:.5;cursor:not-allowed}
 /* ── Stats grid ───────────────────────────────────────── */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
 .stat-card{
-  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;
+  background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);padding:18px;
   display:flex;align-items:center;gap:14px;transition:transform .2s,box-shadow .2s;
   backdrop-filter:blur(var(--glass-blur)) saturate(160%);box-shadow:var(--shadow);
 }
@@ -278,7 +306,7 @@ input.input-disabled,input:disabled{opacity:.5;cursor:not-allowed}
 .room-number{font-weight:700;font-size:1rem}
 .room-status-pill{font-size:.68rem;padding:2px 7px;border-radius:20px;font-weight:700}
 .room-status-pill.occupied{background:rgba(220,38,38,.1);color:var(--danger)}
-.room-status-pill.vacant{background:rgba(22,163,74,.1);color:var(--success)}
+.room-status-pill.vacant{background:rgba(59,130,246,.1);color:#3b82f6}
 .room-rent{font-weight:700;color:var(--accent);font-size:.9rem}
 .room-meta{font-size:.72rem;color:var(--text-muted)}
 .room-tenant-tag{font-size:.75rem;background:rgba(124,58,237,.1);color:#7c3aed;padding:3px 9px;border-radius:8px;width:fit-content}
@@ -294,7 +322,7 @@ input.input-disabled,input:disabled{opacity:.5;cursor:not-allowed}
 .rlc-floor{font-size:.7rem;color:var(--text-muted)}
 .rlc-status{margin-left:auto;font-size:.68rem;font-weight:700}
 .rlc-status.occupied{color:var(--danger)}
-.rlc-status.vacant{color:var(--success)}
+.rlc-status.vacant{color:#3b82f6}
 .rlc-row{display:flex;gap:6px;flex-wrap:wrap}
 .rlc-badge{font-size:.7rem;padding:3px 9px;border-radius:8px;font-weight:700}
 .rlc-badge.success{background:rgba(22,163,74,.1);color:var(--success)}
@@ -395,7 +423,7 @@ input.input-disabled,input:disabled{opacity:.5;cursor:not-allowed}
 .rb-floor,.rb-rent{font-size:.75rem;color:var(--text-muted)}
 .rb-rent{color:var(--accent);font-weight:700}
 .rb-status{font-size:.7rem;font-weight:700}
-.rb-status.vacant{color:var(--success)}
+.rb-status.vacant{color:#3b82f6}
 .rb-status.occupied{color:var(--danger)}
 .rb-request{display:flex;flex-direction:column;gap:5px;margin-top:4px}
 .rb-msg-input{font-size:.78rem;padding:5px 8px}

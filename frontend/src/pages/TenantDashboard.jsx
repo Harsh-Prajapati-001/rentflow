@@ -35,6 +35,7 @@ export default function TenantDashboard() {
   const [notifications, setNotifications] = useState([])
   const [myRequests, setMyRequests] = useState([])
   const [activeTab, setActiveTab] = useState('overview')
+  const [collapsed, setCollapsed] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -74,7 +75,7 @@ export default function TenantDashboard() {
 
   return (
     <div className="tenant-layout">
-      <aside className="sidebar">
+      <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-brand"><img src="/logo.svg" alt="RentFlow Logo" className="brand-icon" style={{width:'28px', height:'28px', marginRight:'8px'}} /><span>RentFlow</span></div>
         {isLinked && (
           <div className="tenant-room-info">
@@ -108,6 +109,9 @@ export default function TenantDashboard() {
       <main className="main-content">
         <header className="top-bar">
           <div className="page-title">
+            <button className="sidebar-toggle" onClick={() => setCollapsed(!collapsed)} title="Toggle sidebar">
+              {collapsed ? '▶' : '◀'}
+            </button>
             <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               {(() => {
                 const ActiveIcon = TABS.find(t => t.id === activeTab)?.icon;

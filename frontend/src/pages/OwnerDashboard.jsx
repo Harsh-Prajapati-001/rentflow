@@ -34,6 +34,7 @@ export default function OwnerDashboard() {
   const { selectedBuilding } = useBuilding()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('dashboard')
+  const [collapsed, setCollapsed] = useState(false)
   const [stats, setStats] = useState(null)
   const [notifications, setNotifications] = useState([])
   const [showNotifications, setShowNotifications] = useState(false)
@@ -63,7 +64,7 @@ export default function OwnerDashboard() {
 
   return (
     <div className="owner-layout">
-      <aside className="sidebar">
+      <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-brand"><img src="/logo.svg" alt="RentFlow Logo" className="brand-icon" style={{width:'28px', height:'28px', marginRight:'8px'}} /><span>RentFlow</span></div>
         <BuildingSelector />
         <nav className="sidebar-nav">
@@ -95,6 +96,9 @@ export default function OwnerDashboard() {
       <main className="main-content">
         <header className="top-bar">
           <div className="page-title">
+            <button className="sidebar-toggle" onClick={() => setCollapsed(!collapsed)} title="Toggle sidebar">
+              {collapsed ? '▶' : '◀'}
+            </button>
             <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               {(() => {
                 const ActiveIcon = TABS.find(t => t.id === activeTab)?.icon;
@@ -203,7 +207,7 @@ function RoomLedgerCard({ room }) {
         <span className="rlc-room">Room {room.room_number}</span>
         {room.floor && <span className="rlc-floor">Floor {room.floor}</span>}
         <span className={`rlc-status ${room.is_occupied ? 'occupied' : 'vacant'}`}>
-          {room.is_occupied ? '🔴 Occupied' : '🟢 Vacant'}
+          {room.is_occupied ? '🔴 Occupied' : '🔵 Vacant'}
         </span>
       </div>
 
