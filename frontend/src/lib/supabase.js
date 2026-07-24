@@ -105,10 +105,30 @@ export const updateTenant = (id, updates) =>
   supabase.from('tenants').update(updates).eq('id', id).select().single()
 
 // ── Room Requests ─────────────────────────────────────────
-export const getRoomRequests = (buildingId) =>
-  supabase.from('room_requests')
-    .select('*, rooms(room_number, floor, rent_amount), profiles(full_name, phone, email)')
-    .eq('building_id', buildingId).order('created_at', { ascending: false })
+export const getRoomRequests = async (buildingId) => {
+  const { data, error } = await supabase.from('room_requests')
+    .select('*, rooms(room_number, floor, rent_amount)')
+    .eq('building_id', buildingId)
+    .order('created_at', { ascending: false })
+    
+  if (error) {
+    console.error("Error fetching room requests:", error)
+    return { data: [], error }
+  }
+
+  if (data && data.length > 0) {
+    const userIds = data.map(r => r.tenant_user_id).filter(Boolean)
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase.from('profiles').select('id, full_name, phone, email').in('id', userIds)
+      if (profiles) {
+        data.forEach(req => {
+          req.profiles = profiles.find(p => p.id === req.tenant_user_id) || null
+        })
+      }
+    }
+  }
+  return { data, error: null }
+}
 
 export const getMyRoomRequests = (userId) =>
   supabase.from('room_requests')
@@ -116,20 +136,24 @@ export const getMyRoomRequests = (userId) =>
     .eq('tenant_user_id', userId).order('created_at', { ascending: false })
 
 export const createRoomRequest = async ({ tenantUserId, roomId, buildingId, ownerId, message }) => {
+  console.log("Creating room request with ownerId:", ownerId)
   const { data, error } = await supabase.from('room_requests').insert({
     tenant_user_id: tenantUserId, room_id: roomId,
     building_id: buildingId, owner_id: ownerId, message
   }).select().single()
 
+  if (error) console.error("Error inserting room_request:", error)
+
   if (data && !error && ownerId) {
     const { data: p } = await supabase.from('profiles').select('full_name').eq('id', tenantUserId).single()
     const { data: r } = await supabase.from('rooms').select('room_number').eq('id', roomId).single()
-    await supabase.from('notifications').insert({
+    const { error: notifErr } = await supabase.from('notifications').insert({
       user_id: ownerId,
       title: 'New Room Request',
       message: `${p?.full_name || 'A tenant'} requested to book Room ${r?.room_number || roomId}.`,
       type: 'info'
     })
+    if (notifErr) console.error("Error inserting notification:", notifErr)
   }
   return { data, error }
 }
