@@ -7,6 +7,7 @@ import OwnerDashboard from './pages/OwnerDashboard'
 import TenantDashboard from './pages/TenantDashboard'
 import LandingPage from './pages/LandingPage'
 import { ThemeProvider } from './hooks/useTheme'
+import { GlobalSvgDefs } from './components/SvgIcons'
 import './styles/global.css'
 
 // ── Error boundary ────────────────────────────────────────
@@ -114,6 +115,7 @@ function AppRoutes() {
 export default function App() {
   return (
     <ErrorBoundary>
+      <GlobalSvgDefs />
       <BrowserRouter>
         <ThemeProvider>
           <AuthProvider>

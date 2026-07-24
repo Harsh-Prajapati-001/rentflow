@@ -12,14 +12,20 @@ import RentManager from '../components/rent/RentManager'
 import ElectricityManager from '../components/electricity/ElectricityManager'
 import DocumentManager from '../components/documents/DocumentManager'
 import NotificationPanel from '../components/notifications/NotificationPanel'
+import { DashboardIcon, RoomsIcon, TenantsIcon, RentIcon, ElectricityIcon, DocumentsIcon, SettingsIcon, NotificationIcon } from '../components/SvgIcons'
+
+const playSound = (soundName) => {
+  const audio = new Audio(`/sounds/${soundName}.m4a`);
+  audio.play().catch(e => console.log('Audio play blocked', e));
+};
 
 const TABS = [
-  { id: 'dashboard',   label: 'Dashboard',   icon: '📊' },
-  { id: 'rooms',       label: 'Rooms',        icon: '🚪' },
-  { id: 'tenants',     label: 'Tenants',      icon: '👥' },
-  { id: 'rent',        label: 'Rent',         icon: '💰' },
-  { id: 'electricity', label: 'Electricity',  icon: '⚡' },
-  { id: 'documents',   label: 'Documents',    icon: '📂' },
+  { id: 'dashboard',   label: 'Dashboard',   icon: DashboardIcon, sound: 'dashboard' },
+  { id: 'rooms',       label: 'Rooms',        icon: RoomsIcon, sound: 'open room' },
+  { id: 'tenants',     label: 'Tenants',      icon: TenantsIcon, sound: 'Tenants' },
+  { id: 'rent',        label: 'Rent',         icon: RentIcon, sound: 'rent' },
+  { id: 'electricity', label: 'Electricity',  icon: ElectricityIcon, sound: 'E shock' },
+  { id: 'documents',   label: 'Documents',    icon: DocumentsIcon, sound: 'docs' },
 ]
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
@@ -58,19 +64,25 @@ export default function OwnerDashboard() {
   return (
     <div className="owner-layout">
       <aside className="sidebar">
-        <div className="sidebar-brand"><span>🏢</span><span>RentFlow</span></div>
+        <div className="sidebar-brand"><img src="/logo.svg" alt="RentFlow Logo" className="brand-icon" style={{width:'28px', height:'28px', marginRight:'8px'}} /><span>RentFlow</span></div>
         <BuildingSelector />
         <nav className="sidebar-nav">
-          {TABS.map(tab => (
-            <button key={tab.id} className={`nav-item ${activeTab === tab.id ? 'active' : ''}`} onClick={() => setActiveTab(tab.id)}>
-              <span className="nav-icon">{tab.icon}</span><span>{tab.label}</span>
-            </button>
-          ))}
+          {TABS.map(tab => {
+            const Icon = tab.icon;
+            return (
+              <button key={tab.id} className={`nav-item ${activeTab === tab.id ? 'active' : ''}`} onClick={() => {
+                setActiveTab(tab.id);
+                playSound(tab.sound);
+              }}>
+                <span className="nav-icon"><Icon /></span><span>{tab.label}</span>
+              </button>
+            )
+          })}
         </nav>
         <div className="sidebar-footer">
           <ThemeToggle />
           <button className="nav-item" onClick={() => setShowBuildingManager(true)}>
-            <span>⚙️</span><span>Manage Buildings</span>
+            <span className="nav-icon"><SettingsIcon /></span><span>Manage Buildings</span>
           </button>
           <div className="user-info">
             <span className="user-name">{profile?.full_name}</span>
@@ -83,14 +95,23 @@ export default function OwnerDashboard() {
       <main className="main-content">
         <header className="top-bar">
           <div className="page-title">
-            <h2>{TABS.find(t => t.id === activeTab)?.icon} {TABS.find(t => t.id === activeTab)?.label}</h2>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {(() => {
+                const ActiveIcon = TABS.find(t => t.id === activeTab)?.icon;
+                return ActiveIcon ? <ActiveIcon style={{ width: '1.2em', height: '1.2em' }} /> : null;
+              })()}
+              {TABS.find(t => t.id === activeTab)?.label}
+            </h2>
             {selectedBuilding && <span className="building-badge">{selectedBuilding.name}</span>}
           </div>
           <div className="top-bar-right">
             {syncStatus === 'running' && <span className="autogen-pill running">⟳ Syncing…</span>}
             {syncStatus === 'done'    && <span className="autogen-pill done">✓ Up to date</span>}
-            <button className="notif-btn" onClick={() => setShowNotifications(!showNotifications)}>
-              🔔 {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+            <button className="notif-btn" style={{ display: 'flex', alignItems: 'center' }} onClick={() => {
+              setShowNotifications(!showNotifications);
+              if (!showNotifications) playSound('notification');
+            }}>
+              <NotificationIcon style={{ width: '1.5em', height: '1.5em', stroke: 'currentColor' }} /> {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
             </button>
           </div>
         </header>

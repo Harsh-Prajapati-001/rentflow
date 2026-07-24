@@ -10,13 +10,19 @@ import {
 } from '../lib/supabase'
 import DocumentManager from '../components/documents/DocumentManager'
 import NotificationPanel from '../components/notifications/NotificationPanel'
+import { DashboardIcon, BrowseIcon, RentIcon, ElectricityIcon, DocumentsIcon, SettingsIcon, NotificationIcon } from '../components/SvgIcons'
+
+const playSound = (soundName) => {
+  const audio = new Audio(`/sounds/${soundName}.m4a`);
+  audio.play().catch(e => console.log('Audio play blocked', e));
+};
 
 const TABS = [
-  { id: 'overview',     label: 'Overview',     icon: '📊' },
-  { id: 'browse',       label: 'Browse Rooms',  icon: '🏠' },
-  { id: 'rent',         label: 'Rent History',  icon: '💰' },
-  { id: 'electricity',  label: 'Electricity',   icon: '⚡' },
-  { id: 'documents',    label: 'Documents',     icon: '📂' },
+  { id: 'overview',     label: 'Overview',     icon: DashboardIcon, sound: 'dashboard' },
+  { id: 'browse',       label: 'Browse Rooms',  icon: BrowseIcon, sound: 'open room' },
+  { id: 'rent',         label: 'Rent History',  icon: RentIcon, sound: 'rent' },
+  { id: 'electricity',  label: 'Electricity',   icon: ElectricityIcon, sound: 'E shock' },
+  { id: 'documents',    label: 'Documents',     icon: DocumentsIcon, sound: 'docs' },
 ]
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
@@ -69,7 +75,7 @@ export default function TenantDashboard() {
   return (
     <div className="tenant-layout">
       <aside className="sidebar">
-        <div className="sidebar-brand"><span>🏢</span><span>RentFlow</span></div>
+        <div className="sidebar-brand"><img src="/logo.svg" alt="RentFlow Logo" className="brand-icon" style={{width:'28px', height:'28px', marginRight:'8px'}} /><span>RentFlow</span></div>
         {isLinked && (
           <div className="tenant-room-info">
             <div className="room-badge">Room {tenant.rooms?.room_number}</div>
@@ -77,11 +83,17 @@ export default function TenantDashboard() {
           </div>
         )}
         <nav className="sidebar-nav">
-          {TABS.filter(t => isLinked || t.id === 'browse').map(tab => (
-            <button key={tab.id} className={`nav-item ${activeTab === tab.id ? 'active' : ''}`} onClick={() => setActiveTab(tab.id)}>
-              <span className="nav-icon">{tab.icon}</span><span>{tab.label}</span>
-            </button>
-          ))}
+          {TABS.filter(t => isLinked || t.id === 'browse').map(tab => {
+            const Icon = tab.icon;
+            return (
+              <button key={tab.id} className={`nav-item ${activeTab === tab.id ? 'active' : ''}`} onClick={() => {
+                setActiveTab(tab.id);
+                playSound(tab.sound);
+              }}>
+                <span className="nav-icon"><Icon /></span><span>{tab.label}</span>
+              </button>
+            )
+          })}
         </nav>
         <div className="sidebar-footer">
           <ThemeToggle />
@@ -95,10 +107,24 @@ export default function TenantDashboard() {
 
       <main className="main-content">
         <header className="top-bar">
-          <h2>{TABS.find(t => t.id === activeTab)?.icon} {TABS.find(t => t.id === activeTab)?.label}</h2>
-          <button className="notif-btn" onClick={() => setShowNotifications(true)}>
-            🔔{unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
-          </button>
+          <div className="page-title">
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {(() => {
+                const ActiveIcon = TABS.find(t => t.id === activeTab)?.icon;
+                return ActiveIcon ? <ActiveIcon style={{ width: '1.2em', height: '1.2em' }} /> : null;
+              })()}
+              {TABS.find(t => t.id === activeTab)?.label}
+            </h2>
+            {tenant && <span className="building-badge">{tenant.building?.name} - {tenant.room?.room_number}</span>}
+          </div>
+          <div className="top-bar-right">
+            <button className="notif-btn" style={{ display: 'flex', alignItems: 'center' }} onClick={() => {
+              setShowNotifications(!showNotifications);
+              if (!showNotifications) playSound('notification');
+            }}>
+              <NotificationIcon style={{ width: '1.5em', height: '1.5em', stroke: 'currentColor' }} /> {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+            </button>
+          </div>
         </header>
 
         <div className="tab-content">
