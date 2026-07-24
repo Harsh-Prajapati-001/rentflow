@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useBuilding } from '../hooks/useBuilding'
 import ThemeToggle from '../components/ThemeToggle'
-import { getBuildingStats, getNotifications, markAllNotificationsRead, autoGenerateRentRecords, signOut } from '../lib/supabase'
+import { getBuildingStats, getNotifications, markAllNotificationsRead, autoGenerateRentRecords, signOut, subscribeToNotifications, unsubscribe } from '../lib/supabase'
 import BuildingSelector from '../components/buildings/BuildingSelector'
 import BuildingManager from '../components/buildings/BuildingManager'
 import RoomManager from '../components/rooms/RoomManager'
@@ -44,6 +44,15 @@ export default function OwnerDashboard() {
   useEffect(() => {
     if (selectedBuilding) { runAutoGenAndLoad(); loadNotifications() }
   }, [selectedBuilding])
+
+  useEffect(() => {
+    if (!user) return
+    const channel = subscribeToNotifications(user.id, (payload) => {
+      setNotifications(prev => [payload.new, ...prev])
+      playSound('notification')
+    })
+    return () => unsubscribe(channel)
+  }, [user])
 
   const runAutoGenAndLoad = async () => {
     setSyncStatus('running')

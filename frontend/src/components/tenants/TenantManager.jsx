@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getTenants, getRooms, createTenant, updateTenant, updateRoom, getRoomRequests, approveRoomRequest, updateRoomRequest } from '../../lib/supabase'
+import { getTenants, getRooms, createTenant, updateTenant, updateRoom, getRoomRequests, approveRoomRequest, updateRoomRequest, subscribeToRoomRequests, unsubscribe } from '../../lib/supabase'
 
 const EMPTY = { full_name: '', phone: '', email: '', whatsapp_number: '', room_id: '', id_proof_type: '', join_date: new Date().toISOString().split('T')[0] }
 
@@ -15,6 +15,12 @@ export default function TenantManager({ buildingId, ownerId, onTenantAdded }) {
   const [activeTab, setActiveTab] = useState('tenants') // tenants | requests
 
   useEffect(() => { load() }, [buildingId])
+
+  useEffect(() => {
+    if (!buildingId) return
+    const channel = subscribeToRoomRequests(buildingId, () => load())
+    return () => unsubscribe(channel)
+  }, [buildingId])
 
   const load = async () => {
     const [tRes, rRes, reqRes] = await Promise.all([getTenants(buildingId), getRooms(buildingId), getRoomRequests(buildingId)])

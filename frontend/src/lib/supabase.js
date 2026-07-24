@@ -115,11 +115,24 @@ export const getMyRoomRequests = (userId) =>
     .select('*, rooms(room_number, floor, rent_amount), buildings(name)')
     .eq('tenant_user_id', userId).order('created_at', { ascending: false })
 
-export const createRoomRequest = ({ tenantUserId, roomId, buildingId, ownerId, message }) =>
-  supabase.from('room_requests').insert({
+export const createRoomRequest = async ({ tenantUserId, roomId, buildingId, ownerId, message }) => {
+  const { data, error } = await supabase.from('room_requests').insert({
     tenant_user_id: tenantUserId, room_id: roomId,
     building_id: buildingId, owner_id: ownerId, message
   }).select().single()
+
+  if (data && !error && ownerId) {
+    const { data: p } = await supabase.from('profiles').select('full_name').eq('id', tenantUserId).single()
+    const { data: r } = await supabase.from('rooms').select('room_number').eq('id', roomId).single()
+    await supabase.from('notifications').insert({
+      user_id: ownerId,
+      title: 'New Room Request',
+      message: `${p?.full_name || 'A tenant'} requested to book Room ${r?.room_number || roomId}.`,
+      type: 'info'
+    })
+  }
+  return { data, error }
+}
 
 export const updateRoomRequest = (id, status) =>
   supabase.from('room_requests').update({ status }).eq('id', id)
@@ -298,6 +311,20 @@ export const markNotificationRead = (id) =>
 
 export const markAllNotificationsRead = (userId) =>
   supabase.from('notifications').update({ is_read: true }).eq('user_id', userId).eq('is_read', false)
+
+export const subscribeToNotifications = (userId, onInsert) => {
+  return supabase.channel('realtime:notifications')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, onInsert)
+    .subscribe()
+}
+
+export const subscribeToRoomRequests = (buildingId, onChange) => {
+  return supabase.channel(`realtime:requests_${buildingId}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'room_requests', filter: `building_id=eq.${buildingId}` }, onChange)
+    .subscribe()
+}
+
+export const unsubscribe = (channel) => supabase.removeChannel(channel)
 
 // ── Dashboard Stats ───────────────────────────────────────
 export const getBuildingStats = async (buildingId) => {
