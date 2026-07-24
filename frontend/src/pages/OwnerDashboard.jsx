@@ -12,7 +12,7 @@ import RentManager from '../components/rent/RentManager'
 import ElectricityManager from '../components/electricity/ElectricityManager'
 import DocumentManager from '../components/documents/DocumentManager'
 import NotificationPanel from '../components/notifications/NotificationPanel'
-import { DashboardIcon, RoomsIcon, TenantsIcon, RentIcon, ElectricityIcon, DocumentsIcon, SettingsIcon, NotificationIcon } from '../components/SvgIcons'
+import { DashboardIcon, RoomsIcon, TenantsIcon, RentIcon, ElectricityIcon, DocumentsIcon, SettingsIcon, NotificationIcon, OccupiedIcon, VacantIcon, PaidIcon, PendingIcon, AlertIcon } from '../components/SvgIcons'
 
 const playSound = (soundName) => {
   const audio = new Audio(`/sounds/${soundName}.m4a`);
@@ -171,20 +171,23 @@ function DashboardView({ stats }) {
       <div className="section-title" style={{ marginTop: 32 }}>Building Summary — {billingLabel}</div>
       <div className="stats-grid">
         {[
-          { label: 'Total Rooms',     value: stats.totalRooms,                                          icon: '🚪', color: 'blue'   },
-          { label: 'Occupied',        value: stats.occupiedRooms,                                       icon: '🏠', color: 'green'  },
-          { label: 'Vacant',          value: stats.totalRooms - stats.occupiedRooms,                    icon: '🔓', color: 'gray'   },
-          { label: 'Active Tenants',  value: stats.totalTenants,                                        icon: '👥', color: 'purple' },
-          { label: 'Paid',            value: stats.paidRent,                                            icon: '✅', color: 'green'  },
-          { label: 'Pending/Overdue', value: stats.unpaidRent,                                          icon: '⏳', color: 'orange' },
-          { label: 'Collected',       value: `₹${stats.totalRentCollected.toLocaleString('en-IN')}`,   icon: '💰', color: 'teal'   },
-          { label: 'Pending Amount',  value: `₹${stats.totalRentDue.toLocaleString('en-IN')}`,         icon: '⚠️', color: 'red'    },
-        ].map(card => (
-          <div key={card.label} className={`stat-card stat-${card.color}`}>
-            <span className="stat-icon">{card.icon}</span>
-            <div><div className="stat-value">{card.value}</div><div className="stat-label">{card.label}</div></div>
-          </div>
-        ))}
+          { label: 'Total Rooms',     value: stats.totalRooms,                                          icon: RoomsIcon, color: 'blue'   },
+          { label: 'Occupied',        value: stats.occupiedRooms,                                       icon: OccupiedIcon, color: 'green'  },
+          { label: 'Vacant',          value: stats.totalRooms - stats.occupiedRooms,                    icon: VacantIcon, color: 'gray'   },
+          { label: 'Active Tenants',  value: stats.totalTenants,                                        icon: TenantsIcon, color: 'purple' },
+          { label: 'Paid',            value: stats.paidRent,                                            icon: PaidIcon, color: 'green'  },
+          { label: 'Pending/Overdue', value: stats.unpaidRent,                                          icon: PendingIcon, color: 'orange' },
+          { label: 'Collected',       value: `₹${stats.totalRentCollected.toLocaleString('en-IN')}`,   icon: RentIcon, color: 'teal'   },
+          { label: 'Pending Amount',  value: `₹${stats.totalRentDue.toLocaleString('en-IN')}`,         icon: AlertIcon, color: 'red'    },
+        ].map(card => {
+          const Icon = card.icon;
+          return (
+            <div key={card.label} className={`stat-card stat-${card.color}`}>
+              <span className="stat-icon"><Icon style={{ width: '1.2em', height: '1.2em' }} /></span>
+              <div><div className="stat-value">{card.value}</div><div className="stat-label">{card.label}</div></div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
