@@ -22,7 +22,7 @@ const playSound = (soundName) => {
 const TABS = [
   { id: 'dashboard',   label: 'Dashboard',   icon: DashboardIcon, sound: 'dashboard' },
   { id: 'rooms',       label: 'Rooms',        icon: RoomsIcon, sound: 'open room' },
-  { id: 'tenants',     label: 'Tenants',      icon: TenantsIcon, sound: 'Tenants' },
+  { id: 'tenants',     label: 'Tenants',      icon: TenantsIcon, sound: 'tenants new' },
   { id: 'rent',        label: 'Rent',         icon: RentIcon, sound: 'rent' },
   { id: 'electricity', label: 'Electricity',  icon: ElectricityIcon, sound: 'E shock' },
   { id: 'documents',   label: 'Documents',    icon: DocumentsIcon, sound: 'docs' },
